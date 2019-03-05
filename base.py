@@ -1,3 +1,11 @@
+"""
+sources :
+
+https://www.pyimagesearch.com/2017/07/10/using-tesseract-ocr-python/
+https://docs.opencv.org/3.1.0/dd/d49/tutorial_py_contour_features.html
+http://blog.ayoungprogrammer.com/2013/01/equation-ocr-part-1-using-contours-to.html/
+"""
+
 import numpy as np
 import cv2
 from PIL import Image
@@ -88,17 +96,17 @@ for elem in elements:
     i += 1
 
 # ------------------- tesseract part -------------------
-i = 0
-for elem in elements:
-    filename = "element%d.png" % i
-    cv2.imwrite(filename, elements[i])
-    text = pytesseract.image_to_string(Image.open(filename))
-    cv2.imshow('elem%d : %s' % (i, text), elem)
-    cv2.waitKey(0)
-    i += 1
-
-os.remove(filename)
-print(text)
+# i = 0
+# for elem in elements:
+#     filename = "element%d.png" % i
+#     cv2.imwrite(filename, elements[i])
+#     text = pytesseract.image_to_string(Image.open(filename))
+#     cv2.imshow('elem%d : %s' % (i, text), elem)
+#     cv2.waitKey(0)
+#     i += 1
+#
+# os.remove(filename)
+# print(text)
 
 
 
