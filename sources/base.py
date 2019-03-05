@@ -20,7 +20,7 @@ except:
     exit()
 
 # ------------------- load the image -------------------
-img = cv2.imread('rotated_basic_addition.jpg',0)
+img = cv2.imread(r"..\img\rotated_basic_addition.jpg",0)
 cv2.imshow('image', img)
 cv2.waitKey(0)
 
