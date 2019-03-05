@@ -13,7 +13,7 @@ import pytesseract
 import os
 
 try:
-    with open("tessereact-path.txt", "r") as f:
+    with open(r"..\tessereact-path.txt", "r") as f:
         pytesseract.pytesseract.tesseract_cmd = f.read()
 except:
     print("Error while accessing tessereact path file")
