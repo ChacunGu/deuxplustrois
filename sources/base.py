@@ -13,15 +13,14 @@ import pytesseract
 import os
 
 try:
-    with open("tessereact-path.txt", "r") as f:
+    with open(r"..\tessereact-path.txt", "r") as f:
         pytesseract.pytesseract.tesseract_cmd = f.read()
 except:
     print("Error while accessing tessereact path file")
     exit()
 
 # ------------------- load the image -------------------
-# img = cv2.imread('rotated_basic_addition.jpg',0)
-img = cv2.imread('clean_all.jpg',0)
+img = cv2.imread(r"..\img\rotated_basic_addition.jpg",0)
 cv2.imshow('image', img)
 cv2.waitKey(0)
 
