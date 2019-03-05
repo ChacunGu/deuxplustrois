@@ -1,5 +1,6 @@
-# Created by https://www.gitignore.io/api/python,opencv,visualstudiocode
-# Edit at https://www.gitignore.io/?templates=python,opencv,visualstudiocode
+
+# Created by https://www.gitignore.io/api/venv,python,opencv,virtualenv,visualstudiocode
+# Edit at https://www.gitignore.io/?templates=venv,python,opencv,virtualenv,visualstudiocode
 
 ### OpenCV ###
 #OpenCV for Mac and Linux
@@ -131,6 +132,22 @@ dmypy.json
 ### Python Patch ###
 .venv/
 
+### venv ###
+# Virtualenv
+# http://iamzed.com/2009/05/07/a-primer-on-virtualenv/
+[Bb]in
+[Ii]nclude
+[Ll]ib
+[Ll]ib64
+[Ll]ocal
+[Ss]cripts
+pyvenv.cfg
+pip-selfcheck.json
+
+### VirtualEnv ###
+# Virtualenv
+# http://iamzed.com/2009/05/07/a-primer-on-virtualenv/
+
 ### VisualStudioCode ###
 .vscode/*
 !.vscode/settings.json
@@ -142,4 +159,4 @@ dmypy.json
 # Ignore all local history of files
 .history
 
-# End of https://www.gitignore.io/api/python,opencv,visualstudiocode
+# End of https://www.gitignore.io/api/venv,python,opencv,virtualenv,visualstudiocode
