@@ -12,7 +12,12 @@ from PIL import Image
 import pytesseract
 import os
 
-pytesseract.pytesseract.tesseract_cmd = r"D:\programmes\OCR_Tesseract\Tesseract-OCR\tesseract.exe"
+try:
+    with open(r"..\tessereact-path.txt", "r") as f:
+        pytesseract.pytesseract.tesseract_cmd = f.read()
+except:
+    print("Error while accessing tessereact path file")
+    exit()
 
 
 def show(img, window_title):
