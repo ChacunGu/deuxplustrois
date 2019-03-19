@@ -13,10 +13,10 @@ import pytesseract
 import os
 
 try:
-    with open(r"..\tessereact-path.txt", "r") as f:
+    with open(r"..\tesseract-path.txt", "r") as f:
         pytesseract.pytesseract.tesseract_cmd = f.read()
 except:
-    print("Error while accessing tessereact path file")
+    print("Error while accessing tesseract path file")
     exit()
 
 
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     create_test_images("additions")
     test_generated_operations("additions")
 
-    # process_image('..\img\\rotated_basic_addition.jpg')
+    process_image("..\img\\rotated_basic_addition.jpg")
 
 
 
