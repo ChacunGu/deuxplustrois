@@ -47,7 +47,7 @@ def test_generated_operations(sub_directory, limit_left_op=10, limit_right_op=10
         for j in range(limit_right_op):
             img_path = f"{SOURCE_DIRECTORY}/{i}_{j}.jpg"
             input = f'{i}{operator}{j}'
-            output = process_image(img_path)
+            output = process_image(img_path, False)
             success = input==output
             print(input, output, success)
             total_success += 1 if success else 0
@@ -92,30 +92,33 @@ def fixRotation(img, contours_in_one):
     return cv2.warpAffine(img,M,(cols,rows))
 
 
-def process_image(img_path):
+def process_image(img_path, show_img=True):
     # ------------------- load the image -------------------
-    # img = cv2.imread('..\img\\base.jpg',0)
-    img = cv2.imread('..\img\\rotated_basic_addition.jpg',0)
-    show(img, "image")
+    img = cv2.imread(img_path, 0)
+    if show_img:
+        show(img, "image")
 
 
     # ------------------- blur the image -------------------
     img_blur = cv2.GaussianBlur(img, (3, 3), 0)
-    show(img_blur, "image blurred")
+    if show_img:
+        show(img_blur, "image blurred")
 
     # ------------------- transform the image in B/W -------------------
     ret, img_thresh = cv2.threshold(img_blur,127,255,cv2.THRESH_BINARY)
-    show(img_thresh, "image treshold")
+    if show_img:
+        show(img_thresh, "image treshold")
 
     # ------------------- find contours of the image -------------------
     contours_in_one = getAllContours(img)
 
     # ------------------- find the bounding rect of the image and rotate -------------------
     img_rotated = fixRotation(img ,contours_in_one)
-    show(img_rotated, "image rotated")
+    if show_img:
+        show(img_rotated, "image rotated")
 
     # ------------------- tesseract part -------------------
-    text = pytesseract.image_to_string(img_thresh, lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
+    text = pytesseract.image_to_string(img_rotated, lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
     # print("full image", text)
 
     # for elem in elements:
@@ -133,8 +136,10 @@ def process_image(img_path):
 
 
 if __name__ == "__main__":
-    # create_test_images("additions")
+    create_test_images("additions")
     test_generated_operations("additions")
+
+    # process_image('..\img\\rotated_basic_addition.jpg')
 
 
 
