@@ -20,9 +20,44 @@ except:
     exit()
 
 
+
+def create_test_images(sub_directory, limit_left_op=10, limit_right_op=10, operator="+", font=cv2.FONT_HERSHEY_DUPLEX):
+    """
+    Creates test images containg each numbers between 0 and parameter limit_left_op an operator and another
+    number between 0 and parameter limit_right_op.
+    """
+    EMPTY_IMAGE = r'../img/clean_empty.jpg'
+    DESTINATION_DIRECTORY = f'../img/generated/{sub_directory}/'
+
+    for i in range(limit_left_op):
+        for j in range(limit_left_op):
+            text = f'{i}{operator}{j}' # define text
+            img = cv2.imread(EMPTY_IMAGE, 1) # load empty image
+            cv2.putText(img, text, (10,100), font, 1, (0, 0, 0), 2, cv2.LINE_AA) # write text on empty image
+            cv2.imwrite(DESTINATION_DIRECTORY + f'{i}_{j}.jpg', img) # save new image
+
+
+def test_generated_operations(sub_directory, limit_left_op=10, limit_right_op=10, operator="+"):
+    """
+    Loads generated images from a subdirectory recreates input and compares with expected output.
+    """
+    SOURCE_DIRECTORY = f'../img/generated/{sub_directory}'
+    total_success = 0
+    for i in range(limit_left_op):
+        for j in range(limit_right_op):
+            img_path = f"{SOURCE_DIRECTORY}/{i}_{j}.jpg"
+            input = f'{i}{operator}{j}'
+            output = process_image(img_path)
+            success = input==output
+            print(input, output, success)
+            total_success += 1 if success else 0
+    print("Success percentage:", (total_success/(limit_left_op*limit_right_op))*100, "%")
+
+
 def show(img, window_title):
     cv2.imshow(window_title, img)
     cv2.waitKey(0)
+
 
 def getAllContours(img):
     im, contours, hierarchy = cv2.findContours(img, 1, 2)
@@ -31,6 +66,7 @@ def getAllContours(img):
             for point in cnt:
                 contours_in_one.append(point[0].tolist())
     return np.array(contours_in_one)
+
 
 def fixRotation(img, contours_in_one):
     box = cv2.minAreaRect(contours_in_one) # returns a box2D object ( center (x,y), (width, height), angle of rotation ).
@@ -56,8 +92,7 @@ def fixRotation(img, contours_in_one):
     return cv2.warpAffine(img,M,(cols,rows))
 
 
-
-if __name__ == "__main__":
+def process_image(img_path):
     # ------------------- load the image -------------------
     # img = cv2.imread('..\img\\base.jpg',0)
     img = cv2.imread('..\img\\rotated_basic_addition.jpg',0)
@@ -79,7 +114,31 @@ if __name__ == "__main__":
     img_rotated = fixRotation(img ,contours_in_one)
     show(img_rotated, "image rotated")
 
+    # ------------------- tesseract part -------------------
+    text = pytesseract.image_to_string(img_thresh, lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
+    # print("full image", text)
+
+    # for elem in elements:
+    #     cv2.imshow('elem : %s' % (text), elem)
+    #     # text = pytesseract.image_to_string(elem)
+    #     # text = pytesseract.image_to_string(elem, lang='eng', config='digits')
+    #     text = pytesseract.image_to_string(elem, lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
+    #     print(text)
+    #     cv2.waitKey(0)
+
     cv2.destroyAllWindows()
+
+    return text
+
+
+
+if __name__ == "__main__":
+    # create_test_images("additions")
+    test_generated_operations("additions")
+
+
+
+
 
 
 
