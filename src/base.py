@@ -11,6 +11,7 @@ import cv2
 from PIL import Image
 import pytesseract
 import os
+from keras.models import load_model
 
 try:
     with open(r"..\tessereact-path.txt", "r") as f:
@@ -63,8 +64,15 @@ def getAllContours(img):
     im, contours, hierarchy = cv2.findContours(img, 1, 2)
     contours_in_one = []
     for cnt in contours[:-1]:
-            for point in cnt:
-                contours_in_one.append(point[0].tolist())
+        for point in cnt:
+            contours_in_one.append(point[0].tolist())
+
+        rect = cv2.minAreaRect(cnt)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        # cv2.drawContours(img,[box],0,(0,0,255),2)
+
+    # show(img, "contours")
     return np.array(contours_in_one)
 
 
@@ -91,13 +99,43 @@ def fixRotation(img, contours_in_one):
 
     return cv2.warpAffine(img,M,(cols,rows))
 
+def resize(img, width):
+    ratio = img.shape[1] / width
+    width = int(img.shape[1] / ratio)
+    height = int(img.shape[0] / ratio)
+    dim = (width, height)
+    resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
+    return resized
+
+def resize_square(img, width):
+    dim = (width, width)
+    resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
+    return resized
+
+def swap_bw(img):
+    for x in range(len(img)):
+        for y in range(len(img[x])):
+            if img[x][y] == 0:
+                img[x][y] = 255
+            else:
+                img[x][y] = 0
+    return img
+
+def mnist_predict(img, model):
+    ret, img = cv2.threshold(img,127,255,cv2.THRESH_BINARY)
+    img = resize_square(img, 28)
+    show(img, "image")
+    img = swap_bw(img)
+    show(img, "image")
+    img = img.reshape(-1, 28, 28, 1)
+    return model.predict_classes(img)
 
 def process_image(img_path, show_img=True):
     # ------------------- load the image -------------------
     img = cv2.imread(img_path, 0)
+    #img = resize(img, 600)
     if show_img:
         show(img, "image")
-
 
     # ------------------- blur the image -------------------
     img_blur = cv2.GaussianBlur(img, (3, 3), 0)
@@ -110,12 +148,13 @@ def process_image(img_path, show_img=True):
         show(img_thresh, "image treshold")
 
     # ------------------- find contours of the image -------------------
-    contours_in_one = getAllContours(img)
+    contours_in_one = getAllContours(img_thresh)
 
     # ------------------- find the bounding rect of the image and rotate -------------------
-    img_rotated = fixRotation(img ,contours_in_one)
-    if show_img:
-        show(img_rotated, "image rotated")
+    # img_rotated = fixRotation(img_thresh, contours_in_one)
+    # if show_img:
+    #     show(img_rotated, "image rotated")
+    img_rotated = img_thresh
 
     # ------------------- tesseract part -------------------
     text = pytesseract.image_to_string(img_rotated, lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
@@ -136,15 +175,17 @@ def process_image(img_path, show_img=True):
 
 
 if __name__ == "__main__":
-    create_test_images("additions")
-    test_generated_operations("additions")
+    # create_test_images("additions")
+    # test_generated_operations("additions")
 
-    # process_image('..\img\\rotated_basic_addition.jpg')
+    #print(process_image('..\img\\hw_add_fat.jpg'))
 
+    model = load_model("../model/mnist_DNN.h5")
+    model.summary()
 
+    img = cv2.imread("../img/seven.jpg", 0)
 
-
-
+    print(mnist_predict(img, model))
 
 
 
