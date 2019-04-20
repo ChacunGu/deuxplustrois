@@ -21,7 +21,6 @@ except:
     exit()
 
 
-
 def create_test_images(sub_directory, limit_left_op=10, limit_right_op=10, operator="+", font=cv2.FONT_HERSHEY_DUPLEX):
     """
     Creates test images containg each numbers between 0 and parameter limit_left_op an operator and another
@@ -91,6 +90,10 @@ def fixRotation(img, contours_in_one):
     # cv2.drawContours(img2,[box],0,(0,0,255),2)
     # show(img2, "image2")
 
+    if angle > -5 or angle < -85:
+        print(angle)
+        return img
+
     if w < h:
         angle = angle + 90
 
@@ -98,6 +101,20 @@ def fixRotation(img, contours_in_one):
     M = cv2.getRotationMatrix2D((cols/2,rows/2),angle,1) # angle + 90
 
     return cv2.warpAffine(img,M,(cols,rows))
+
+
+def extract_elements(img):
+    im, contours, hierarchy = cv2.findContours(img, 1, 2)
+    # image_individual_bounding_rect = img
+    elements = []
+    for cnt in contours[:-1]:
+        x,y,w,h = cv2.boundingRect(cnt)
+        # bounding_rect = [[x, y], [x+w, y], [x+w, y+h], [x, y+h]]
+        # cv2.rectangle(image_individual_bounding_rect,tuple(bounding_rect[0]),tuple(bounding_rect[2]),(0,255,0),2)
+        elements.append(img[y:y+h, x:x+w])
+
+    return elements
+
 
 def resize(img, width):
     ratio = img.shape[1] / width
@@ -128,12 +145,13 @@ def mnist_predict(img, model):
     img = swap_bw(img)
     show(img, "image")
     img = img.reshape(-1, 28, 28, 1)
-    return model.predict_classes(img)
+    # return model.predict_classes(img)
+    return model.predict(img)
 
-def process_image(img_path, show_img=True):
+def process_image(img_path, model, show_img=True):
     # ------------------- load the image -------------------
     img = cv2.imread(img_path, 0)
-    #img = resize(img, 600)
+    img = resize(img, 600)
     if show_img:
         show(img, "image")
 
@@ -151,13 +169,18 @@ def process_image(img_path, show_img=True):
     contours_in_one = getAllContours(img_thresh)
 
     # ------------------- find the bounding rect of the image and rotate -------------------
-    # img_rotated = fixRotation(img_thresh, contours_in_one)
-    # if show_img:
-    #     show(img_rotated, "image rotated")
-    img_rotated = img_thresh
+    img_rotated = fixRotation(img_thresh, contours_in_one)
+    if show_img:
+        show(img_rotated, "image rotated")
+
+    # ------------------- find the bounding rect of the image and rotate -------------------
+    elements = extract_elements(img_rotated) # TODO amlioration (balayage)
+
+    for elem in elements:
+        show(elem, "COUCOU")
 
     # ------------------- tesseract part -------------------
-    text = pytesseract.image_to_string(img_rotated, lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
+    # text = pytesseract.image_to_string(img_rotated, lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
     # print("full image", text)
 
     # for elem in elements:
@@ -168,60 +191,35 @@ def process_image(img_path, show_img=True):
     #     print(text)
     #     cv2.waitKey(0)
 
-    cv2.destroyAllWindows()
+    # ------------------- mnist prediction -------------------
+    equation_text = ""
+    for element in elements:
+        prediction = mnist_predict(element, model)[0]
+        print(prediction)
+        prediction_accuracy_index = np.argmax(prediction)
+        prediction_accuracy = prediction[prediction_accuracy_index]
+        if prediction_accuracy < 0.75:
+            tesseract_prediction = pytesseract.image_to_string(elem, lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
+            if len(tesseract_prediction) == 1 and tesseract_prediction in ["+", "-", "*", "/"]:
+                equation_text += tesseract_prediction
+                continue
+        equation_text += str(prediction_accuracy_index)
 
-    return text
+    cv2.destroyAllWindows() # ?????
+
+    return equation_text
 
 
 
 if __name__ == "__main__":
     # create_test_images("additions")
     # test_generated_operations("additions")
-    create_test_images("additions")
-    test_generated_operations("additions")
-
-    process_image("..\img\\rotated_basic_addition.jpg")
-
-    
 
     model = load_model("../model/mnist_DNN.h5")
     model.summary()
 
-    img = cv2.imread("../img/seven.jpg", 0)
+    equation_text = process_image("../img/hw_add.jpg", model)
 
-    print(mnist_predict(img, model))
+    print(equation_text)
 
-
-
-
-
-    # img_bounding_rect2 = img
-    # cv2.rectangle(img_bounding_rect2,(x, y),(x+h, y+w),(0,255,0),2)
-    # rect = cv2.boxPoints(box) # get the points of the box
-    # rect = np.int0(rect)
-    # cv2.drawContours(img_bounding_rect2,[rect],0,(0,0,255),2)
-    # cv2.imshow('image bounding rect 2', img_bounding_rect2)
-    # cv2.waitKey(0)
-
-    # crop_img = img[y:y+w, x:x+h]
-    # cv2.imshow('image crop', crop_img)
-    # cv2.waitKey(0)
-
-    # ------------------- extract the contours -------------------
-    # im, contours, hierarchy = cv2.findContours(img_thresh, 1, 2)
-    # image_individual_bounding_rect = img
-    # elements = []
-    # for cnt in contours[:]:
-    #         x,y,w,h = cv2.boundingRect(cnt)
-    #         bounding_rect = [[x, y], [x+w, y], [x+w, y+h], [x, y+h]]
-    #         cv2.rectangle(image_individual_bounding_rect,tuple(bounding_rect[0]),tuple(bounding_rect[2]),(0,255,0),2)
-    #         elements.append(img[y:y+h, x:x+w])
-    #
-    # cv2.imshow('image individual bounding rect', image_individual_bounding_rect)
-    # cv2.waitKey(0)
-    #
-    # i = 0
-    # for elem in elements:
-    #     cv2.imshow('elem%d' % i, elem)
-    #     cv2.waitKey(0)
-    #     i += 1
+    # solve_equation(equation_text)
