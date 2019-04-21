@@ -114,26 +114,38 @@ def copy_onto_white_square(img, margin=50, show_img=False):
 
     return cv2.cvtColor(white_square, cv2.COLOR_BGR2GRAY)
 
-def dilate(img, target_bw_ratio=0.15, show_img=False):
+def dilate(img, kernel=None, show_img=False):
     """
-    Dilates given image until desired black and white pixel ratio is reached.
+    Dilates given image.
     """
-    img_dilated = img.copy()
-    kernel = np.ones((7, 7), np.uint8)
-
-    while compute_black_white_ratio(img_dilated) < target_bw_ratio:
-        img_dilated = cv2.erode(img_dilated, kernel, iterations = 1) # use erode as the image's element is in black and not white!!
-
+    kernel = np.ones((5, 5), np.uint8) if kernel is None else kernel
+    img_dilated = cv2.erode(img, kernel, iterations = 1) # use erode as the image's element is in black and not white!!
+    
     if show_img:
         show(img_dilated, "Dilated image")
 
     return img_dilated
 
-def erode(img, show_img=False):
+def dilate_until_bw_ratio_reached(img, target_bw_ratio=0.15, kernel=None, show_img=False):
+    """
+    Dilates given image until desired black and white pixel ratio is reached.
+    """
+    img_dilated = img.copy()
+    kernel = np.ones((7, 7), np.uint8) if kernel is None else kernel
+
+    while compute_black_white_ratio(img_dilated) < target_bw_ratio:
+        img_dilated = cv2.erode(img_dilated, kernel, iterations = 1) # use erode as the image's element is in black and not white!!
+
+    if show_img:
+        show(img_dilated, "Dilated image to adjust black/white ratio")
+
+    return img_dilated
+
+def erode(img, kernel=None, show_img=False):
     """
     Erodes given image to remove noise.
     """
-    kernel = np.ones((5, 5), np.uint8)
+    kernel = np.ones((5, 5), np.uint8) if kernel is None else kernel
     img_eroded = cv2.dilate(img, kernel, iterations = 1) # use dilate as the image's element is in black and not white!!
 
     if show_img:
@@ -365,7 +377,7 @@ def mnist_predict(img, model, show_img=False):
     Uses the given MNSIT model to predict which digit's on the given image.
     Returns a dictionnary with digits as keys and probabilities as values.
     """
-    img = cv2.threshold(img,127,255,cv2.THRESH_BINARY)[1]
+    img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)[1]
     img = resize_square(img, 28, show_img)
     img = swap_bw(img, show_img)
     img = img.reshape(-1, 28, 28, 1)
@@ -395,6 +407,9 @@ def process_image(img_path, model, show_img=False):
     # ------------------- erode the image to remove noise -------------------
     img = erode(img, show_img=show_img)
 
+    # ------------------- dilate the image to restore lost element's weight after erosion -------------------
+    img = dilate(img, show_img=show_img)
+
     # ------------------- find contours of the image -------------------
     contours_in_one = get_all_contours(img, show_img=show_img)
 
@@ -407,8 +422,8 @@ def process_image(img_path, model, show_img=False):
     # ------------------- copy each element onto a white square with a margin -------------------
     elements = [copy_onto_white_square(element, show_img=show_img) for element in elements]
 
-    # ------------------- dilate each element if needed -------------------
-    elements = [dilate(element, show_img=show_img) for element in elements]
+    # ------------------- dilate each element to obtain minimal black/white ratio -------------------
+    elements = [dilate_until_bw_ratio_reached(element, show_img=show_img) for element in elements]
 
     # ------------------- mnist/tesseract prediction -------------------
     equation_text = retrieve_equation(elements, model, show_img=show_img)
@@ -426,7 +441,7 @@ if __name__ == "__main__":
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
 
-    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=True)
+    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=False)
 
     print(f"Your equation: {equation_text}")
 
