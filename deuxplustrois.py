@@ -269,7 +269,20 @@ def swap_bw(img, show_img=False):
 
     return img
 
-def dilate(img, target_bw_ratio=0.1, show_img=False):
+def erode(img, show_img=False):
+    """
+    Erodes given image to remove noise.
+    """
+    kernel = np.ones((5, 5), np.uint8)
+    img_eroded = cv2.dilate(img, kernel, iterations = 1) # use dilate as the image's element is in black and not white!!
+
+    if show_img:
+        show(img_eroded, "Eroded image")
+
+    return img_eroded
+
+
+def dilate(img, target_bw_ratio=0.15, show_img=False):
     """
     Dilates given image until desired black and white pixel ratio is reached.
     """
@@ -277,7 +290,7 @@ def dilate(img, target_bw_ratio=0.1, show_img=False):
     kernel = np.ones((7, 7), np.uint8)
 
     while compute_black_white_ratio(img_dilated) < target_bw_ratio:
-        img_dilated = cv2.erode(img_dilated, kernel, iterations = 1) # use erode as the image's element is in black !!
+        img_dilated = cv2.erode(img_dilated, kernel, iterations = 1) # use erode as the image's element is in black and not white!!
 
     if show_img:
         show(img_dilated, "Dilated image")
@@ -317,11 +330,14 @@ def process_image(img_path, model, show_img=False):
     if show_img:
         show(img_thresh, "After applying threshold")
 
+    # ------------------- erode the image to remove noise -------------------
+    img_eroded = erode(img_thresh, show_img=show_img)
+
     # ------------------- find contours of the image -------------------
-    contours_in_one = get_all_contours(img_thresh, show_img=show_img)
+    contours_in_one = get_all_contours(img_eroded, show_img=show_img)
 
     # ------------------- find the bounding rect of the image and rotate -------------------
-    img_rotated = fix_rotation(img_thresh, contours_in_one, show_img=show_img)
+    img_rotated = fix_rotation(img_eroded, contours_in_one, show_img=show_img)
 
     # ------------------- extract the equation's elements from the image -------------------
     elements = extract_elements(img_rotated, show_img=show_img)
