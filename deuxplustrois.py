@@ -95,6 +95,8 @@ def fix_rotation(img, contours_in_one, show_img=False):
     w, h, x, y = int(w), int(h), int(x), int(y)
 
     if angle > -5 or angle < -85:
+        if show_img:
+            show(img, "Rotated image")
         return img
     if w < h:
         angle = angle + 90
@@ -108,9 +110,69 @@ def fix_rotation(img, contours_in_one, show_img=False):
 
     return img_rotated
 
+def search_all_elements_x_bounds(img):
+    """
+    Searches image's elements x bounds.
+    """
+    # bounds: first and last columns index containing a black pixel with columns containing at least one black pixel in between
+    x_bounds = []
+    for x in range(img.shape[1]):
+        for y in range(img.shape[0]): # search in each column
+            white_column = True
+            if img[y][x] == 0: # black pixel
+                white_column = False
+                if len(x_bounds) % 2 == 0: # found first black pixel of new element
+                    x_bounds.append(x) # element's left bound
+                break
+        if len(x_bounds) % 2 == 1 and white_column: # found first white pixel after element
+            x_bounds.append(x-1) # element's right bound
+    return x_bounds
+
+def search_element_y_bounds(img, left_x_bound, right_x_bound, img_y_extremas):
+    """
+    Searches y bounds for element within given x range.
+    """
+    y_bounds = img_y_extremas.copy()
+    for x in range(left_x_bound, right_x_bound): # element's x bounds
+        for y in range(img.shape[0]):
+            if img[y][x] == 0:
+                # search bounds
+                if y < y_bounds[0]:
+                    y_bounds[0] = y
+                if y > y_bounds[1]:
+                    y_bounds[1] = y
+    return y_bounds
+
 def extract_elements(img, show_img=False):
     """
     Identifies and returns the different image's elements.
+    """
+    elements = []
+
+    # search x bounds:
+    x_bounds = search_all_elements_x_bounds(img)
+
+    img_y_extremas = [img.shape[1], -1]
+    if len(x_bounds) > 0:
+        # search y bounds
+        for element_index in range(int(len(x_bounds)/2)): # for each element
+            element_y_bounds = search_element_y_bounds(img, 
+                                                       x_bounds[0 + element_index*2], 
+                                                       x_bounds[1 + element_index*2] + 1,
+                                                       img_y_extremas)
+
+            # if bounding rect is defined
+            if element_y_bounds[0] is not img_y_extremas[0] and element_y_bounds[1] is not img_y_extremas[1]:
+                elements.append(img[element_y_bounds[0]:element_y_bounds[1]+1, 
+                                    x_bounds[0 + element_index*2]:x_bounds[1 + element_index*2]+1])
+                if show_img:
+                    show(elements[-1], "Extracted element")
+
+    return elements
+
+def extract_elements_opencv(img, show_img=False):
+    """
+    Identifies and returns the different image's elements (uses OpenCV findContours() method).
     """
     contours = cv2.findContours(img, 1, 2)[1]
     elements = []
@@ -153,12 +215,12 @@ def swap_bw(img, show_img=False):
     """
     Modifies and returns the image as black pixels becomes white and whites becomes blacks.
     """
-    for x in range(len(img)):
-        for y in range(len(img[x])):
-            if img[x][y] == 0:
-                img[x][y] = 255
+    for x in range(img.shape[1]):
+        for y in range(img.shape[0]):
+            if img[y][x] == 0:
+                img[y][x] = 255
             else:
-                img[x][y] = 0
+                img[y][x] = 0
     
     if show_img:
         show(img, "Swapped blacks and whites")
@@ -236,8 +298,8 @@ if __name__ == "__main__":
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
 
-    equation_text = process_image("img/clean_basic_addition.jpg", model, show_img=True)
+    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=True)
 
-    print(equation_text)
+    print(f"Your equation: {equation_text}")
 
     # solve_equation(equation_text)
