@@ -58,7 +58,7 @@ def test_generated_operations(sub_directory, limit_left_op=10, limit_right_op=10
 
 
 # image processing methods
-def adjust_element_weight(img, target_bw_min_ratio=0.15, target_bw_max_ratio=0.30, kernel=None, show_img=False):
+def adjust_element_weight(img, target_bw_min_ratio=0.15, target_bw_max_ratio=0.20, kernel=None, show_img=False):
     """
     Adjusts element's weight by dilating or eroding until the targeted ratio is reached.
     """
@@ -278,6 +278,10 @@ def load_and_resize(img_path, default_width=600, show_img=False):
     Returns the image.
     """
     img = cv2.imread(img_path, 0)
+    if img is None:
+        print(f"File has not been found or is of an unsupported format: {img_path}")
+        exit()
+
     img = resize(img, default_width)
 
     if show_img:
@@ -370,7 +374,7 @@ def swap_bw(img, show_img=False):
 
 
 # prediction methods and global pipeline
-def retrieve_equation(elements, model, use_both_models=True, show_img=False):
+def retrieve_equation(elements, model, show_img=False):
     """
     Uses MNIST and Tesseract to predict what represents each image's element and retrieve
     the complete equation.
@@ -379,20 +383,17 @@ def retrieve_equation(elements, model, use_both_models=True, show_img=False):
     equation_text = ""
     for element in elements:
 
-        if use_both_models:
-            # predict with MNIST
-            mnist_prediction = mnist_predict(element, model, show_img=show_img)
-            mnist_prediction = str(np.argmax(mnist_prediction))
-            
-            # predict with Tesseract
-            tesseract_prediction = tesseract_predict(element)
+        # predict with MNIST
+        mnist_prediction = mnist_predict(element, model, show_img=show_img)
+        mnist_prediction = str(np.argmax(mnist_prediction))
 
-            # choose a prediction
-            equation_text += tesseract_prediction if tesseract_prediction in ["+", "-", "x", "/"] or \
-                                                     tesseract_prediction == mnist_prediction \
-                                                  else mnist_prediction
-        else:
-            equation_text += tesseract_predict(element)
+        # predict with Tesseract
+        tesseract_prediction = tesseract_predict(element)
+
+        # choose a prediction
+        equation_text += tesseract_prediction if tesseract_prediction in ["+", "-", "x", "/", "="] or \
+                                                    tesseract_prediction == mnist_prediction \
+                                                else mnist_prediction
     return equation_text
 
 def mnist_predict(img, model, show_img=False):
@@ -406,14 +407,14 @@ def mnist_predict(img, model, show_img=False):
     img = img.reshape(-1, 28, 28, 1)
     return model.predict(img)[0]
 
-def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0123456789+-x/"):
+def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0123456789+-x/="):
     """
     Uses Tesseract to predict which digit's on the given image.
     Returns a string containing the predicted digit.
     """
     return pytesseract.image_to_string(img, lang="eng", config=config)
 
-def process_image(img_path, model, use_both_models=True, show_img=False):
+def process_image(img_path, model, show_img=False):
     """
     Reads image and predicts which equation it contains.
     Returns a string containing concatenated digits and elements (i.e. '2+3').
@@ -449,12 +450,62 @@ def process_image(img_path, model, use_both_models=True, show_img=False):
     elements = [adjust_element_weight(element, show_img=show_img) for element in elements]
 
     # ------------------- mnist/tesseract prediction -------------------
-    equation_text = retrieve_equation(elements, model, use_both_models=use_both_models, show_img=show_img)
+    equation_text = retrieve_equation(elements, model, show_img=show_img)
 
     if show_img:
         cv2.destroyAllWindows()
 
     return equation_text
+
+def solve_equation(equation):
+    """
+    Reads given equation as string, converts it to digits and signs, computes the result and displays it.
+    """
+    elements = []
+    nb_digits = 0
+    nb_signs = 0
+
+    # retrieve equation's elements
+    for c in equation:
+        try:
+            digit = str(int(c))
+            if len(elements) > 0:
+                if elements[-1][0] == "digit":
+                    elements[-1][1] += digit # multiple digits number
+                    continue
+            elements.append(["digit", digit]) # new number
+            nb_digits += 1
+        except:
+            sign = c
+            if len(elements) <= 0 or elements[-1][0] == "sign" or sign == "=":
+                continue # invalid
+            elements.append(["sign", sign]) # new sign
+            nb_signs += 1
+
+    # compute equation's result if structure's valid
+    if len(elements) > 0 and elements[0][0] == "digit" and elements[-1][0] == "digit" and nb_digits == nb_signs+1 and nb_digits >= 2:
+        result = int(elements[0][1])
+        solved_equation = f"{elements[0][1]} "
+
+        for i in range(1, len(elements), 2):
+            solved_equation += f"{elements[i][1]} {elements[i+1][1]} "
+            if elements[i][1] == "+":
+                result += int(elements[i+1][1])
+            elif elements[i][1] == "-":
+                result -= int(elements[i+1][1])
+            elif elements[i][1] == "/":
+                result /= int(elements[i+1][1])
+            elif elements[i][1] == "*":
+                result *= int(elements[i+1][1])
+            else:
+                print(f"Unknown sign at index {i} for this equation: {equation}")
+                exit()
+        solved_equation += f"= {result}"
+
+        print(solved_equation)
+    else:
+        print(f"Structure error for this equation: {equation}")
+        exit()
 
 
 if __name__ == "__main__":
@@ -465,8 +516,8 @@ if __name__ == "__main__":
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
 
-    equation_text = process_image("img/hw_add_rot.jpg", model, use_both_models=False, show_img=False)
+    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=False)
 
-    print(f"Your equation: {equation_text}")
+    # print(f"Your equation: {equation_text}")
 
-    # solve_equation(equation_text)
+    solve_equation(equation_text)
