@@ -80,6 +80,14 @@ def get_all_contours(img, show_img=False):
             cv2.drawContours(img2, [box] , 0, (0, 0, 255), 2)
             show(img2, "Image element's contour")
 
+    if show_img:
+        box = cv2.minAreaRect(np.array(contours_in_one))
+        box = cv2.boxPoints(box)
+        box = np.int0(box)
+        img2 = img.copy()
+        cv2.drawContours(img2, [box] , 0, (0, 0, 255), 2)
+        show(img2, "Elements min rect")
+
     return np.array(contours_in_one)
 
 def fix_rotation(img, contours_in_one, show_img=False):
@@ -103,7 +111,7 @@ def fix_rotation(img, contours_in_one, show_img=False):
 
     rows, cols = img.shape
     M = cv2.getRotationMatrix2D((cols/2, rows/2), angle, 1) # angle + 90
-    img_rotated = cv2.warpAffine(img, M, (cols, rows))
+    img_rotated = cv2.warpAffine(img, M, (cols, rows), borderMode=cv2.BORDER_CONSTANT, borderValue=(255,255,255))
 
     if show_img:
         show(img_rotated, "Rotated image")
