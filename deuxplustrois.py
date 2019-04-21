@@ -163,7 +163,7 @@ def extract_elements(img, show_img=False):
     img_y_extremas = [img.shape[1], -1]
     if len(x_bounds) > 0:
         # search y bounds
-        for element_index in range(int(len(x_bounds)/2)): # for each element
+        for element_index in range(len(x_bounds)//2): # for each element
             element_y_bounds = search_element_y_bounds(img, 
                                                        x_bounds[0 + element_index*2], 
                                                        x_bounds[1 + element_index*2] + 1,
@@ -192,6 +192,32 @@ def extract_elements_opencv(img, show_img=False):
 
     return elements
 
+def copy_onto_white_square(img, margin=50, show_img=False):
+    """
+    Copies the given image inside a white square and with a given margin.
+    """
+    if img.shape[0] > img.shape[1]:
+        square_width = img.shape[0] + 2*margin
+        y_offset = margin
+        x_offset = (img.shape[0] - img.shape[1])//2 + margin
+    else:
+        square_width = img.shape[1] + 2*margin
+        y_offset = (img.shape[1] - img.shape[0])//2 + margin
+        x_offset = margin
+
+    white_square = np.zeros((square_width,square_width,3), np.uint8)
+    white_square[:, 0:square_width//2] = (255, 255, 255)
+    white_square[:, square_width//2:square_width] = (255, 255, 255)
+
+    for x in range(img.shape[1]):
+        for y in range(img.shape[0]):
+            white_square[y+y_offset][x+x_offset] = img[y][x]
+    
+    if show_img:
+        show(white_square, "Square image")
+
+    return white_square
+    
 def resize(img, width, show_img=False):
     """
     Resizes the given image with the given ratio (old_width/width).
@@ -275,6 +301,10 @@ def process_image(img_path, model, show_img=False):
 
     # ------------------- extract the equation's elements from the image -------------------
     elements = extract_elements(img_rotated, show_img)
+
+    # ------------------- copy each element onto a white square with a margin -------------------
+    for element in elements:
+        copy_onto_white_square(element, show_img=show_img)
 
     # ------------------- mnist/tesseract prediction -------------------
     equation_text = ""
