@@ -58,6 +58,22 @@ def test_generated_operations(sub_directory, limit_left_op=10, limit_right_op=10
 
 
 # image processing methods
+def adjust_element_weight(img, target_bw_min_ratio=0.15, target_bw_max_ratio=0.30, kernel=None, show_img=False):
+    """
+    Adjusts element's weight by dilating or eroding until the targeted ratio is reached.
+    """
+    kernel = np.ones((7, 7), np.uint8) if kernel is None else kernel
+
+    if compute_black_white_ratio(img) < target_bw_min_ratio:
+        img = dilate_until_bw_ratio_reached(img, kernel, target_bw_min_ratio)
+    elif compute_black_white_ratio(img) > target_bw_max_ratio:
+        img = erode_until_bw_ratio_reached(img, kernel, target_bw_max_ratio)
+
+    if show_img:
+        show(img, "Transformed image to adjust black/white ratio")
+
+    return img
+
 def apply_threshold(img, thresh=127, maxval=255, show_img=False):
     """
     Applies a threshold to the image and returns it.
@@ -126,18 +142,13 @@ def dilate(img, kernel=None, show_img=False):
 
     return img_dilated
 
-def dilate_until_bw_ratio_reached(img, target_bw_ratio=0.15, kernel=None, show_img=False):
+def dilate_until_bw_ratio_reached(img, kernel, target_bw_min_ratio=0.15):
     """
     Dilates given image until desired black and white pixel ratio is reached.
     """
     img_dilated = img.copy()
-    kernel = np.ones((7, 7), np.uint8) if kernel is None else kernel
-
-    while compute_black_white_ratio(img_dilated) < target_bw_ratio:
+    while compute_black_white_ratio(img_dilated) < target_bw_min_ratio:
         img_dilated = cv2.erode(img_dilated, kernel, iterations = 1) # use erode as the image's element is in black and not white!!
-
-    if show_img:
-        show(img_dilated, "Dilated image to adjust black/white ratio")
 
     return img_dilated
 
@@ -150,6 +161,16 @@ def erode(img, kernel=None, show_img=False):
 
     if show_img:
         show(img_eroded, "Eroded image")
+
+    return img_eroded
+
+def erode_until_bw_ratio_reached(img, kernel, target_bw_max_ratio=0.30):
+    """
+    Erodes given image until desired black and white pixel ratio is reached.
+    """
+    img_eroded = img.copy()
+    while compute_black_white_ratio(img_eroded) > target_bw_max_ratio:
+        img_eroded = cv2.dilate(img_eroded, kernel, iterations = 1) # use dilate as the image's element is in black and not white!!
 
     return img_eroded
 
@@ -422,8 +443,8 @@ def process_image(img_path, model, show_img=False):
     # ------------------- copy each element onto a white square with a margin -------------------
     elements = [copy_onto_white_square(element, show_img=show_img) for element in elements]
 
-    # ------------------- dilate each element to obtain minimal black/white ratio -------------------
-    elements = [dilate_until_bw_ratio_reached(element, show_img=show_img) for element in elements]
+    # ------------------- dilate or erode each element to obtain minimal black/white ratio -------------------
+    elements = [adjust_element_weight(element, show_img=show_img) for element in elements]
 
     # ------------------- mnist/tesseract prediction -------------------
     equation_text = retrieve_equation(elements, model, show_img=show_img)
@@ -441,7 +462,7 @@ if __name__ == "__main__":
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
 
-    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=False)
+    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=True)
 
     print(f"Your equation: {equation_text}")
 
