@@ -61,6 +61,14 @@ def show(img, window_title):
     cv2.imshow(window_title, img)
     cv2.waitKey(0)
 
+def compute_black_white_ratio(img):
+    """
+    Computes and returns the black and white pixels ratio for the given image.
+    """
+    blacks = sum([1 for x in range(img.shape[1]) for y in range(img.shape[0]) if img[y][x] == 0])
+    whites = img.shape[0]*img.shape[1] - blacks
+    return blacks / whites
+
 def get_all_contours(img, show_img=False):
     """
     Returns an array containing each point forming a contour of any element in the image.
@@ -205,7 +213,7 @@ def copy_onto_white_square(img, margin=50, show_img=False):
         y_offset = (img.shape[1] - img.shape[0])//2 + margin
         x_offset = margin
 
-    white_square = np.zeros((square_width,square_width,3), np.uint8)
+    white_square = np.zeros((square_width, square_width, 3), np.uint8)
     white_square[:, 0:square_width//2] = (255, 255, 255)
     white_square[:, square_width//2:square_width] = (255, 255, 255)
 
@@ -216,7 +224,7 @@ def copy_onto_white_square(img, margin=50, show_img=False):
     if show_img:
         show(white_square, "Square image")
 
-    return white_square
+    return cv2.cvtColor(white_square, cv2.COLOR_BGR2GRAY)
     
 def resize(img, width, show_img=False):
     """
@@ -261,6 +269,22 @@ def swap_bw(img, show_img=False):
 
     return img
 
+def dilate(img, target_bw_ratio=0.1, show_img=False):
+    """
+    Dilates given image until desired black and white pixel ratio is reached.
+    """
+    img_dilated = img.copy()
+    kernel = np.ones((7, 7), np.uint8)
+
+    while compute_black_white_ratio(img_dilated) < target_bw_ratio:
+        img_dilated = cv2.erode(img_dilated, kernel, iterations = 1) # use erode as the image's element is in black !!
+
+    if show_img:
+        show(img_dilated, "Dilated image")
+
+    return img_dilated
+
+
 def mnist_predict(img, model, show_img=False):
     """
     Uses the given MNSIT model to predict which digit's on the given image. 
@@ -297,14 +321,16 @@ def process_image(img_path, model, show_img=False):
     contours_in_one = get_all_contours(img_thresh, show_img=show_img)
 
     # ------------------- find the bounding rect of the image and rotate -------------------
-    img_rotated = fix_rotation(img_thresh, contours_in_one, show_img)
+    img_rotated = fix_rotation(img_thresh, contours_in_one, show_img=show_img)
 
     # ------------------- extract the equation's elements from the image -------------------
-    elements = extract_elements(img_rotated, show_img)
+    elements = extract_elements(img_rotated, show_img=show_img)
 
     # ------------------- copy each element onto a white square with a margin -------------------
-    for element in elements:
-        copy_onto_white_square(element, show_img=show_img)
+    elements = [copy_onto_white_square(element, show_img=show_img) for element in elements]
+
+    # ------------------- dilate each element if needed -------------------
+    elements = [dilate(element, show_img=show_img) for element in elements]
 
     # ------------------- mnist/tesseract prediction -------------------
     equation_text = ""
@@ -336,7 +362,7 @@ if __name__ == "__main__":
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
 
-    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=True)
+    equation_text = process_image("img/hw_add_fat.jpg", model, show_img=True)
 
     print(f"Your equation: {equation_text}")
 
