@@ -15,6 +15,7 @@ import pytesseract
 import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.ERROR)
 
+# program initialization
 try:
     with open(r"tesseract-path.txt", "r") as f:
         pytesseract.pytesseract.tesseract_cmd = f.read()
@@ -23,6 +24,7 @@ except:
     exit()
 
 
+# automatic test methods
 def create_test_images(sub_directory, limit_left_op=10, limit_right_op=10, operator="+", font=cv2.FONT_HERSHEY_DUPLEX):
     """
     Creates test images containg each numbers between 0 and parameter limit_left_op an operator and another
@@ -54,12 +56,29 @@ def test_generated_operations(sub_directory, limit_left_op=10, limit_right_op=10
             total_success += 1 if success else 0
     print("Success percentage:", (total_success/(limit_left_op*limit_right_op))*100, "%")
 
-def show(img, window_title):
+
+# image processing methods
+def apply_threshold(img, thresh=127, maxval=255, show_img=False):
     """
-    Displays given image.
+    Applies a threshold to the image and returns it.
     """
-    cv2.imshow(window_title, img)
-    cv2.waitKey(0)
+    img_thresh = cv2.threshold(img, thresh, maxval, cv2.THRESH_BINARY)[1]
+
+    if show_img:
+        show(img_thresh, "After applying threshold")
+
+    return img_thresh
+
+def blur(img, show_img=False):
+    """
+    Blurs the image and returs it.
+    """
+    img_blur = cv2.GaussianBlur(img, (3, 3), 0)
+
+    if show_img:
+        show(img_blur, "Blurred image")
+
+    return img_blur
 
 def compute_black_white_ratio(img):
     """
@@ -69,95 +88,58 @@ def compute_black_white_ratio(img):
     whites = img.shape[0]*img.shape[1] - blacks
     return blacks / whites
 
-def get_all_contours(img, show_img=False):
+def copy_onto_white_square(img, margin=50, show_img=False):
     """
-    Returns an array containing each point forming a contour of any element in the image.
+    Copies the given image inside a white square and with a given margin.
     """
-    contours = cv2.findContours(img, 1, 2)[1]
-    contours_in_one = []
-    for cnt in contours[:-1]:
-        for point in cnt:
-            contours_in_one.append(point[0].tolist())
+    if img.shape[0] > img.shape[1]:
+        square_width = img.shape[0] + 2*margin
+        y_offset = margin
+        x_offset = (img.shape[0] - img.shape[1])//2 + margin
+    else:
+        square_width = img.shape[1] + 2*margin
+        y_offset = (img.shape[1] - img.shape[0])//2 + margin
+        x_offset = margin
 
-        rect = cv2.minAreaRect(cnt)
-        box = cv2.boxPoints(rect)
-        box = np.int0(box)
+    white_square = np.zeros((square_width, square_width, 3), np.uint8)
+    white_square[:, 0:square_width//2] = (255, 255, 255)
+    white_square[:, square_width//2:square_width] = (255, 255, 255)
 
-        if show_img:
-            img2 = img.copy()
-            cv2.drawContours(img2, [box] , 0, (0, 0, 255), 2)
-            show(img2, "Image element's contour")
-
-    if show_img:
-        box = cv2.minAreaRect(np.array(contours_in_one))
-        box = cv2.boxPoints(box)
-        box = np.int0(box)
-        img2 = img.copy()
-        cv2.drawContours(img2, [box] , 0, (0, 0, 255), 2)
-        show(img2, "Elements min rect")
-
-    return np.array(contours_in_one)
-
-def fix_rotation(img, contours_in_one, show_img=False):
-    """
-    Rotates the image until it's perfectly horizontal.
-    """
-    box = cv2.minAreaRect(contours_in_one) # returns a box2D object ( center (x,y), (width, height), angle of rotation ).
-    w = box[1][0]
-    h = box[1][1]
-    x = box[0][0] - h/2
-    y = box[0][1] - w/2
-    angle = box[2]
-    w, h, x, y = int(w), int(h), int(x), int(y)
-
-    if angle > -5 or angle < -85:
-        if show_img:
-            show(img, "Rotated image")
-        return img
-    if w < h:
-        angle = angle + 90
-
-    rows, cols = img.shape
-    M = cv2.getRotationMatrix2D((cols/2, rows/2), angle, 1) # angle + 90
-    img_rotated = cv2.warpAffine(img, M, (cols, rows), borderMode=cv2.BORDER_CONSTANT, borderValue=(255,255,255))
-
-    if show_img:
-        show(img_rotated, "Rotated image")
-
-    return img_rotated
-
-def search_all_elements_x_bounds(img):
-    """
-    Searches image's elements x bounds.
-    """
-    # bounds: first and last columns index containing a black pixel with columns containing at least one black pixel in between
-    x_bounds = []
     for x in range(img.shape[1]):
-        for y in range(img.shape[0]): # search in each column
-            white_column = True
-            if img[y][x] == 0: # black pixel
-                white_column = False
-                if len(x_bounds) % 2 == 0: # found first black pixel of new element
-                    x_bounds.append(x) # element's left bound
-                break
-        if len(x_bounds) % 2 == 1 and white_column: # found first white pixel after element
-            x_bounds.append(x-1) # element's right bound
-    return x_bounds
-
-def search_element_y_bounds(img, left_x_bound, right_x_bound, img_y_extremas):
-    """
-    Searches y bounds for element within given x range.
-    """
-    y_bounds = img_y_extremas.copy()
-    for x in range(left_x_bound, right_x_bound): # element's x bounds
         for y in range(img.shape[0]):
-            if img[y][x] == 0:
-                # search bounds
-                if y < y_bounds[0]:
-                    y_bounds[0] = y
-                if y > y_bounds[1]:
-                    y_bounds[1] = y
-    return y_bounds
+            white_square[y+y_offset][x+x_offset] = img[y][x]
+    
+    if show_img:
+        show(white_square, "Square image")
+
+    return cv2.cvtColor(white_square, cv2.COLOR_BGR2GRAY)
+
+def dilate(img, target_bw_ratio=0.15, show_img=False):
+    """
+    Dilates given image until desired black and white pixel ratio is reached.
+    """
+    img_dilated = img.copy()
+    kernel = np.ones((7, 7), np.uint8)
+
+    while compute_black_white_ratio(img_dilated) < target_bw_ratio:
+        img_dilated = cv2.erode(img_dilated, kernel, iterations = 1) # use erode as the image's element is in black and not white!!
+
+    if show_img:
+        show(img_dilated, "Dilated image")
+
+    return img_dilated
+
+def erode(img, show_img=False):
+    """
+    Erodes given image to remove noise.
+    """
+    kernel = np.ones((5, 5), np.uint8)
+    img_eroded = cv2.dilate(img, kernel, iterations = 1) # use dilate as the image's element is in black and not white!!
+
+    if show_img:
+        show(img_eroded, "Eroded image")
+
+    return img_eroded
 
 def extract_elements(img, show_img=False):
     """
@@ -200,32 +182,76 @@ def extract_elements_opencv(img, show_img=False):
 
     return elements
 
-def copy_onto_white_square(img, margin=50, show_img=False):
+def fix_rotation(img, contours_in_one, show_img=False):
     """
-    Copies the given image inside a white square and with a given margin.
+    Rotates the image until it's perfectly horizontal.
     """
-    if img.shape[0] > img.shape[1]:
-        square_width = img.shape[0] + 2*margin
-        y_offset = margin
-        x_offset = (img.shape[0] - img.shape[1])//2 + margin
-    else:
-        square_width = img.shape[1] + 2*margin
-        y_offset = (img.shape[1] - img.shape[0])//2 + margin
-        x_offset = margin
+    box = cv2.minAreaRect(contours_in_one) # returns a box2D object ( center (x,y), (width, height), angle of rotation ).
+    w = box[1][0]
+    h = box[1][1]
+    x = box[0][0] - h/2
+    y = box[0][1] - w/2
+    angle = box[2]
+    w, h, x, y = int(w), int(h), int(x), int(y)
 
-    white_square = np.zeros((square_width, square_width, 3), np.uint8)
-    white_square[:, 0:square_width//2] = (255, 255, 255)
-    white_square[:, square_width//2:square_width] = (255, 255, 255)
+    if angle > -5 or angle < -85:
+        if show_img:
+            show(img, "Rotated image")
+        return img
+    if w < h:
+        angle = angle + 90
 
-    for x in range(img.shape[1]):
-        for y in range(img.shape[0]):
-            white_square[y+y_offset][x+x_offset] = img[y][x]
-    
+    rows, cols = img.shape
+    M = cv2.getRotationMatrix2D((cols/2, rows/2), angle, 1) # angle + 90
+    img_rotated = cv2.warpAffine(img, M, (cols, rows), borderMode=cv2.BORDER_CONSTANT, borderValue=(255,255,255))
+
     if show_img:
-        show(white_square, "Square image")
+        show(img_rotated, "Rotated image")
 
-    return cv2.cvtColor(white_square, cv2.COLOR_BGR2GRAY)
-    
+    return img_rotated
+
+def get_all_contours(img, show_img=False):
+    """
+    Returns an array containing each point forming a contour of any element in the image.
+    """
+    contours = cv2.findContours(img, 1, 2)[1]
+    contours_in_one = []
+    for cnt in contours[:-1]:
+        for point in cnt:
+            contours_in_one.append(point[0].tolist())
+
+        rect = cv2.minAreaRect(cnt)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+
+        if show_img:
+            img2 = img.copy()
+            cv2.drawContours(img2, [box] , 0, (0, 0, 255), 2)
+            show(img2, "Image element's contour")
+
+    if show_img:
+        box = cv2.minAreaRect(np.array(contours_in_one))
+        box = cv2.boxPoints(box)
+        box = np.int0(box)
+        img2 = img.copy()
+        cv2.drawContours(img2, [box] , 0, (0, 0, 255), 2)
+        show(img2, "Elements min rect")
+
+    return np.array(contours_in_one)
+
+def load_and_resize(img_path, default_width=600, show_img=False):
+    """
+    Loads and resizes the image to the specified width. Width/height ratio is not changed.
+    Returns the image.
+    """
+    img = cv2.imread(img_path, 0)
+    img = resize(img, default_width)
+
+    if show_img:
+        show(img, "Default image")
+
+    return img
+
 def resize(img, width, show_img=False):
     """
     Resizes the given image with the given ratio (old_width/width).
@@ -253,6 +279,46 @@ def resize_square(img, width, show_img=False):
 
     return resized
 
+def search_all_elements_x_bounds(img):
+    """
+    Searches image's elements x bounds.
+    """
+    # bounds: first and last columns index containing a black pixel with columns containing at least one black pixel in between
+    x_bounds = []
+    for x in range(img.shape[1]):
+        for y in range(img.shape[0]): # search in each column
+            white_column = True
+            if img[y][x] == 0: # black pixel
+                white_column = False
+                if len(x_bounds) % 2 == 0: # found first black pixel of new element
+                    x_bounds.append(x) # element's left bound
+                break
+        if len(x_bounds) % 2 == 1 and white_column: # found first white pixel after element
+            x_bounds.append(x-1) # element's right bound
+    return x_bounds
+
+def search_element_y_bounds(img, left_x_bound, right_x_bound, img_y_extremas):
+    """
+    Searches y bounds for element within given x range.
+    """
+    y_bounds = img_y_extremas.copy()
+    for x in range(left_x_bound, right_x_bound): # element's x bounds
+        for y in range(img.shape[0]):
+            if img[y][x] == 0:
+                # search bounds
+                if y < y_bounds[0]:
+                    y_bounds[0] = y
+                if y > y_bounds[1]:
+                    y_bounds[1] = y
+    return y_bounds
+
+def show(img, window_title):
+    """
+    Displays given image.
+    """
+    cv2.imshow(window_title, img)
+    cv2.waitKey(0)
+
 def swap_bw(img, show_img=False):
     """
     Modifies and returns the image as black pixels becomes white and whites becomes blacks.
@@ -269,34 +335,30 @@ def swap_bw(img, show_img=False):
 
     return img
 
-def erode(img, show_img=False):
+
+# prediction methods and global pipeline
+def retrieve_equation(elements, model, show_img=False):
     """
-    Erodes given image to remove noise.
+    Uses MNIST and Tesseract to predict what represents each image's element and retrieve
+    the complete equation.
+    Returns the equations as a string.
     """
-    kernel = np.ones((5, 5), np.uint8)
-    img_eroded = cv2.dilate(img, kernel, iterations = 1) # use dilate as the image's element is in black and not white!!
+    equation_text = ""
+    for element in elements:
+        # predict with MNIST
+        prediction = mnist_predict(element, model, show_img=show_img)
+        prediction_index = np.argmax(prediction)
+        prediction_probability = prediction[prediction_index]
 
-    if show_img:
-        show(img_eroded, "Eroded image")
-
-    return img_eroded
-
-
-def dilate(img, target_bw_ratio=0.15, show_img=False):
-    """
-    Dilates given image until desired black and white pixel ratio is reached.
-    """
-    img_dilated = img.copy()
-    kernel = np.ones((7, 7), np.uint8)
-
-    while compute_black_white_ratio(img_dilated) < target_bw_ratio:
-        img_dilated = cv2.erode(img_dilated, kernel, iterations = 1) # use erode as the image's element is in black and not white!!
-
-    if show_img:
-        show(img_dilated, "Dilated image")
-
-    return img_dilated
-
+        if prediction_probability < 1.0: 
+            # if MNIST prediction's probability is low it's probabily because it's not a digit
+            # -> let tesseract do its prediction
+            tesseract_prediction = tesseract_predict(element)
+            if len(tesseract_prediction) == 1 and tesseract_prediction in ["+", "-", "*", "/"]:
+                equation_text += tesseract_prediction
+                continue
+        equation_text += str(prediction_index)
+    return equation_text
 
 def mnist_predict(img, model, show_img=False):
     """
@@ -307,7 +369,14 @@ def mnist_predict(img, model, show_img=False):
     img = resize_square(img, 28, show_img)
     img = swap_bw(img, show_img)
     img = img.reshape(-1, 28, 28, 1)
-    return model.predict(img)[0] # model.predict_classes(img)
+    return model.predict(img)[0]
+
+def tesseract_predict(img, config="--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789"):
+    """
+    Uses Tesseract to predict which digit's on the given image.
+    Returns a string containing the predicted digit.
+    """
+    return pytesseract.image_to_string(img, lang="eng", config=config)
 
 def process_image(img_path, model, show_img=False):
     """
@@ -315,32 +384,25 @@ def process_image(img_path, model, show_img=False):
     Returns a string containing concatenated digits and elements (i.e. '2+3').
     """
     # ------------------- load the image -------------------
-    img = cv2.imread(img_path, 0)
-    img = resize(img, 600)
-    if show_img:
-        show(img, "Default image")
+    img = load_and_resize(img_path, show_img=show_img)
 
     # ------------------- blur the image -------------------
-    img_blur = cv2.GaussianBlur(img, (3, 3), 0)
-    if show_img:
-        show(img_blur, "Blurred image")
+    img = blur(img, show_img=show_img)
 
     # ------------------- transform the image in B/W -------------------
-    img_thresh = cv2.threshold(img_blur, 127, 255, cv2.THRESH_BINARY)[1]
-    if show_img:
-        show(img_thresh, "After applying threshold")
-
+    img = apply_threshold(img, show_img=show_img)
+    
     # ------------------- erode the image to remove noise -------------------
-    img_eroded = erode(img_thresh, show_img=show_img)
+    img = erode(img, show_img=show_img)
 
     # ------------------- find contours of the image -------------------
-    contours_in_one = get_all_contours(img_eroded, show_img=show_img)
+    contours_in_one = get_all_contours(img, show_img=show_img)
 
     # ------------------- find the bounding rect of the image and rotate -------------------
-    img_rotated = fix_rotation(img_eroded, contours_in_one, show_img=show_img)
+    img = fix_rotation(img, contours_in_one, show_img=show_img)
 
     # ------------------- extract the equation's elements from the image -------------------
-    elements = extract_elements(img_rotated, show_img=show_img)
+    elements = extract_elements(img, show_img=show_img)
 
     # ------------------- copy each element onto a white square with a margin -------------------
     elements = [copy_onto_white_square(element, show_img=show_img) for element in elements]
@@ -349,21 +411,7 @@ def process_image(img_path, model, show_img=False):
     elements = [dilate(element, show_img=show_img) for element in elements]
 
     # ------------------- mnist/tesseract prediction -------------------
-    equation_text = ""
-    for element in elements:
-        # predict with MNIST
-        prediction = mnist_predict(element, model)
-        prediction_index = np.argmax(prediction)
-        prediction_probability = prediction[prediction_index]
-
-        if prediction_probability < 1.0: 
-            # if MNIST prediction's probability is low it's probabily because it's not a digit
-            # -> let tesseract do its prediction
-            tesseract_prediction = pytesseract.image_to_string(element, lang="eng", config="--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789")
-            if len(tesseract_prediction) == 1 and tesseract_prediction in ["+", "-", "*", "/"]:
-                equation_text += tesseract_prediction
-                continue
-        equation_text += str(prediction_index)
+    equation_text = retrieve_equation(elements, model, show_img=show_img)
 
     if show_img:
         cv2.destroyAllWindows()
@@ -378,7 +426,7 @@ if __name__ == "__main__":
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
 
-    equation_text = process_image("img/hw_add_fat.jpg", model, show_img=True)
+    equation_text = process_image("img/hw_add.jpg", model, show_img=False)
 
     print(f"Your equation: {equation_text}")
 
