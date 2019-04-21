@@ -370,7 +370,7 @@ def swap_bw(img, show_img=False):
 
 
 # prediction methods and global pipeline
-def retrieve_equation(elements, model, show_img=False):
+def retrieve_equation(elements, model, use_both_models=True, show_img=False):
     """
     Uses MNIST and Tesseract to predict what represents each image's element and retrieve
     the complete equation.
@@ -378,19 +378,21 @@ def retrieve_equation(elements, model, show_img=False):
     """
     equation_text = ""
     for element in elements:
-        # predict with MNIST
-        prediction = mnist_predict(element, model, show_img=show_img)
-        prediction_index = np.argmax(prediction)
-        prediction_probability = prediction[prediction_index]
 
-        if prediction_probability <= 1.0:
-            # if MNIST prediction's probability is low it's probabily because it's not a digit
-            # -> let tesseract do its prediction
+        if use_both_models:
+            # predict with MNIST
+            mnist_prediction = mnist_predict(element, model, show_img=show_img)
+            mnist_prediction = str(np.argmax(mnist_prediction))
+            
+            # predict with Tesseract
             tesseract_prediction = tesseract_predict(element)
-            if len(tesseract_prediction) == 1 and tesseract_prediction in ["+", "-", "*", "/"]:
-                equation_text += tesseract_prediction
-                continue
-        equation_text += str(prediction_index)
+
+            # choose a prediction
+            equation_text += tesseract_prediction if tesseract_prediction in ["+", "-", "x", "/"] or \
+                                                     tesseract_prediction == mnist_prediction \
+                                                  else mnist_prediction
+        else:
+            equation_text += tesseract_predict(element)
     return equation_text
 
 def mnist_predict(img, model, show_img=False):
@@ -411,7 +413,7 @@ def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0
     """
     return pytesseract.image_to_string(img, lang="eng", config=config)
 
-def process_image(img_path, model, show_img=False):
+def process_image(img_path, model, use_both_models=True, show_img=False):
     """
     Reads image and predicts which equation it contains.
     Returns a string containing concatenated digits and elements (i.e. '2+3').
@@ -447,7 +449,7 @@ def process_image(img_path, model, show_img=False):
     elements = [adjust_element_weight(element, show_img=show_img) for element in elements]
 
     # ------------------- mnist/tesseract prediction -------------------
-    equation_text = retrieve_equation(elements, model, show_img=show_img)
+    equation_text = retrieve_equation(elements, model, use_both_models=use_both_models, show_img=show_img)
 
     if show_img:
         cv2.destroyAllWindows()
@@ -459,10 +461,11 @@ if __name__ == "__main__":
     # create_test_images("additions")
     # test_generated_operations("additions")
 
+
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
 
-    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=True)
+    equation_text = process_image("img/hw_add_rot.jpg", model, use_both_models=False, show_img=False)
 
     print(f"Your equation: {equation_text}")
 
