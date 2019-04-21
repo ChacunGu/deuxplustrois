@@ -108,7 +108,7 @@ def copy_onto_white_square(img, margin=50, show_img=False):
     for x in range(img.shape[1]):
         for y in range(img.shape[0]):
             white_square[y+y_offset][x+x_offset] = img[y][x]
-    
+
     if show_img:
         show(white_square, "Square image")
 
@@ -154,14 +154,14 @@ def extract_elements(img, show_img=False):
     if len(x_bounds) > 0:
         # search y bounds
         for element_index in range(len(x_bounds)//2): # for each element
-            element_y_bounds = search_element_y_bounds(img, 
-                                                       x_bounds[0 + element_index*2], 
+            element_y_bounds = search_element_y_bounds(img,
+                                                       x_bounds[0 + element_index*2],
                                                        x_bounds[1 + element_index*2] + 1,
                                                        img_y_extremas)
 
             # if bounding rect is defined
             if element_y_bounds[0] is not img_y_extremas[0] and element_y_bounds[1] is not img_y_extremas[1]:
-                elements.append(img[element_y_bounds[0]:element_y_bounds[1]+1, 
+                elements.append(img[element_y_bounds[0]:element_y_bounds[1]+1,
                                     x_bounds[0 + element_index*2]:x_bounds[1 + element_index*2]+1])
                 if show_img:
                     show(elements[-1], "Extracted element")
@@ -261,7 +261,7 @@ def resize(img, width, show_img=False):
     height = int(img.shape[0] / ratio)
     dim = (width, height)
     resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
-    
+
     if show_img:
         show(resized, "Resized image")
 
@@ -273,7 +273,7 @@ def resize_square(img, width, show_img=False):
     """
     dim = (width, width)
     resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
-    
+
     if show_img:
         show(resized, "Resized image")
 
@@ -329,7 +329,7 @@ def swap_bw(img, show_img=False):
                 img[y][x] = 255
             else:
                 img[y][x] = 0
-    
+
     if show_img:
         show(img, "Swapped blacks and whites")
 
@@ -350,7 +350,7 @@ def retrieve_equation(elements, model, show_img=False):
         prediction_index = np.argmax(prediction)
         prediction_probability = prediction[prediction_index]
 
-        if prediction_probability < 1.0: 
+        if prediction_probability <= 1.0:
             # if MNIST prediction's probability is low it's probabily because it's not a digit
             # -> let tesseract do its prediction
             tesseract_prediction = tesseract_predict(element)
@@ -362,7 +362,7 @@ def retrieve_equation(elements, model, show_img=False):
 
 def mnist_predict(img, model, show_img=False):
     """
-    Uses the given MNSIT model to predict which digit's on the given image. 
+    Uses the given MNSIT model to predict which digit's on the given image.
     Returns a dictionnary with digits as keys and probabilities as values.
     """
     img = cv2.threshold(img,127,255,cv2.THRESH_BINARY)[1]
@@ -371,7 +371,7 @@ def mnist_predict(img, model, show_img=False):
     img = img.reshape(-1, 28, 28, 1)
     return model.predict(img)[0]
 
-def tesseract_predict(img, config="--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789"):
+def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0123456789+-x/"):
     """
     Uses Tesseract to predict which digit's on the given image.
     Returns a string containing the predicted digit.
@@ -391,7 +391,7 @@ def process_image(img_path, model, show_img=False):
 
     # ------------------- transform the image in B/W -------------------
     img = apply_threshold(img, show_img=show_img)
-    
+
     # ------------------- erode the image to remove noise -------------------
     img = erode(img, show_img=show_img)
 
@@ -426,7 +426,7 @@ if __name__ == "__main__":
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
 
-    equation_text = process_image("img/hw_add.jpg", model, show_img=False)
+    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=True)
 
     print(f"Your equation: {equation_text}")
 
