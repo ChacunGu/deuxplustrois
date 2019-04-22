@@ -6,6 +6,7 @@ https://docs.opencv.org/3.1.0/dd/d49/tutorial_py_contour_features.html
 http://blog.ayoungprogrammer.com/2013/01/equation-ocr-part-1-using-contours-to.html/
 """
 
+import copy
 import cv2
 from keras.models import load_model
 import numpy as np
@@ -374,27 +375,61 @@ def swap_bw(img, show_img=False):
 
 
 # prediction methods and global pipeline
-def retrieve_equation(elements, model, show_img=False):
+def extract_elements_from_string_equation(equation):
     """
-    Uses MNIST and Tesseract to predict what represents each image's element and retrieve
-    the complete equation.
-    Returns the equations as a string.
+    Reads given equation as string, converts it to digits and signs.
+    Returns an array containing in each element a subarray with at index 0 the extracted element's
+    type ("digit" or "sign") and at index 1 the element (int for a digit and string for a sign). Returns
+    also the number of digits and signs found.
+    I.e. [["digit", 2], ["sign", "+"], ["digit", 3]], 2, 1
     """
-    equation_text = ""
-    for element in elements:
+    elements = []
+    nb_digits = 0
+    nb_signs = 0
 
-        # predict with MNIST
-        mnist_prediction = mnist_predict(element, model, show_img=show_img)
-        mnist_prediction = str(np.argmax(mnist_prediction))
+    # retrieve equation's elements
+    for c in equation:
+        try:
+            digit = str(int(c))
+            if len(elements) > 0:
+                if elements[-1][0] == "digit":
+                    elements[-1][1] += digit # multiple digits number
+                    continue
+            elements.append(["digit", digit]) # new number
+            nb_digits += 1
+        except:
+            sign = c
+            if len(elements) <= 0 or elements[-1][0] == "sign" or sign == "=":
+                continue # invalid
+            elements.append(["sign", sign]) # new sign
+            nb_signs += 1
+    return elements, nb_digits, nb_signs
 
-        # predict with Tesseract
-        tesseract_prediction = tesseract_predict(element)
-
-        # choose a prediction
-        equation_text += tesseract_prediction if tesseract_prediction in ["+", "-", "x", "/", "="] or \
-                                                    tesseract_prediction == mnist_prediction \
-                                                else mnist_prediction
-    return equation_text
+def compute_equation_result(elements):
+    """
+    Uses reduction to compute and finally return the equation's result.
+    """
+    elements = copy.deepcopy(elements)
+    for sign in ["x", "/", "+", "-"]: # respect operations priority
+        for i in range(0, len(elements)-1, 2):
+            if elements[i+1][1] == sign:
+                if elements[i+1][1] == "x":
+                    elements[i+2][1] = float(elements[i+0][1]) * float(elements[i+2][1])
+                elif elements[i+1][1] == "/":
+                    elements[i+2][1] = float(elements[i+0][1]) / float(elements[i+2][1])
+                elif elements[i+1][1] == "+":
+                    elements[i+2][1] = float(elements[i+0][1]) + float(elements[i+2][1])
+                elif elements[i+1][1] == "-":
+                    elements[i+2][1] = float(elements[i+0][1]) - float(elements[i+2][1])
+                elements[i+0] = None
+                elements[i+1] = None
+        
+        # remove None elements
+        elements = [element for element in elements if element is not None]
+    
+    if (len(elements) > 1):
+        return None    
+    return elements[0][1]
 
 def mnist_predict(img, model, show_img=False):
     """
@@ -406,13 +441,6 @@ def mnist_predict(img, model, show_img=False):
     img = swap_bw(img, show_img)
     img = img.reshape(-1, 28, 28, 1)
     return model.predict(img)[0]
-
-def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0123456789+-x/="):
-    """
-    Uses Tesseract to predict which digit's on the given image.
-    Returns a string containing the predicted digit.
-    """
-    return pytesseract.image_to_string(img, lang="eng", config=config)
 
 def process_image(img_path, model, show_img=False):
     """
@@ -457,55 +485,50 @@ def process_image(img_path, model, show_img=False):
 
     return equation_text
 
+def retrieve_equation(elements, model, show_img=False):
+    """
+    Uses MNIST and Tesseract to predict what represents each image's element and retrieve
+    the complete equation.
+    Returns the equations as a string.
+    """
+    equation_text = ""
+    for element in elements:
+
+        # predict with MNIST
+        mnist_prediction = mnist_predict(element, model, show_img=show_img)
+        mnist_prediction = str(np.argmax(mnist_prediction))
+
+        # predict with Tesseract
+        tesseract_prediction = tesseract_predict(element)
+
+        # choose a prediction
+        equation_text += tesseract_prediction if tesseract_prediction in ["+", "-", "x", "/", "="] or \
+                                                    tesseract_prediction == mnist_prediction \
+                                                else mnist_prediction
+    return equation_text
+
 def solve_equation(equation):
     """
     Reads given equation as string, converts it to digits and signs, computes the result and displays it.
     """
-    elements = []
-    nb_digits = 0
-    nb_signs = 0
-
-    # retrieve equation's elements
-    for c in equation:
-        try:
-            digit = str(int(c))
-            if len(elements) > 0:
-                if elements[-1][0] == "digit":
-                    elements[-1][1] += digit # multiple digits number
-                    continue
-            elements.append(["digit", digit]) # new number
-            nb_digits += 1
-        except:
-            sign = c
-            if len(elements) <= 0 or elements[-1][0] == "sign" or sign == "=":
-                continue # invalid
-            elements.append(["sign", sign]) # new sign
-            nb_signs += 1
-
-    # compute equation's result if structure's valid
+    elements, nb_digits, nb_signs = extract_elements_from_string_equation(equation)
+    
+    # compute equation's result if structure is valid
     if len(elements) > 0 and elements[0][0] == "digit" and elements[-1][0] == "digit" and nb_digits == nb_signs+1 and nb_digits >= 2:
-        result = int(elements[0][1])
-        solved_equation = f"{elements[0][1]} "
+        result = compute_equation_result(elements)
+        if result is not None:
+            solved_equation = " ".join([element[1] for element in elements])
+            solved_equation += f" = {result}"
+            return solved_equation
+    print(f"Unable to solve this equation: {equation}")
+    exit()
 
-        for i in range(1, len(elements), 2):
-            solved_equation += f"{elements[i][1]} {elements[i+1][1]} "
-            if elements[i][1] == "+":
-                result += int(elements[i+1][1])
-            elif elements[i][1] == "-":
-                result -= int(elements[i+1][1])
-            elif elements[i][1] == "/":
-                result /= int(elements[i+1][1])
-            elif elements[i][1] == "*":
-                result *= int(elements[i+1][1])
-            else:
-                print(f"Unknown sign at index {i} for this equation: {equation}")
-                exit()
-        solved_equation += f"= {result}"
-
-        print(solved_equation)
-    else:
-        print(f"Structure error for this equation: {equation}")
-        exit()
+def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0123456789+-x/="):
+    """
+    Uses Tesseract to predict which digit's on the given image.
+    Returns a string containing the predicted digit.
+    """
+    return pytesseract.image_to_string(img, lang="eng", config=config)
 
 
 if __name__ == "__main__":
@@ -520,4 +543,4 @@ if __name__ == "__main__":
 
     # print(f"Your equation: {equation_text}")
 
-    solve_equation(equation_text)
+    print("Your equation:", solve_equation(equation_text))
