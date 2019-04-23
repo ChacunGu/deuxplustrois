@@ -395,21 +395,31 @@ def extract_elements_from_string_equation(equation):
     nb_signs = 0
 
     # retrieve equation's elements
-    for c in equation:
-        try:
-            digit = str(int(c))
-            if len(elements) > 0:
-                if elements[-1][0] == "digit":
-                    elements[-1][1] += digit # multiple digits number
-                    continue
-            elements.append(["digit", digit]) # new number
+    index = 0
+    while index < len(equation):
+        c = equation[index]
+        if len(elements) == 0 and c == "-" and len(equation) > 1:
+            index += 1
+            elements.append(["digit", f"-{equation[index]}"]) # new number
             nb_digits += 1
-        except:
-            sign = c
-            if len(elements) <= 0 or elements[-1][0] == "sign" or sign == "=":
-                continue # invalid
-            elements.append(["sign", sign]) # new sign
-            nb_signs += 1
+        else:
+            try:
+                digit = str(int(c))
+                if len(elements) > 0:
+                    if elements[-1][0] == "digit":
+                        elements[-1][1] += digit # multiple digits number
+                        index += 1
+                        continue
+                elements.append(["digit", digit]) # new number
+                nb_digits += 1
+            except:
+                sign = c
+                if len(elements) <= 0 or elements[-1][0] == "sign" or sign == "=":
+                    index += 1
+                    continue # invalid
+                elements.append(["sign", sign]) # new sign
+                nb_signs += 1
+        index += 1
     return elements, nb_digits, nb_signs
 
 def compute_equation_result(elements):
@@ -508,7 +518,6 @@ def retrieve_equation(elements, model, favor_tesseract=True, show_img=False):
         tesseract_prediction = tesseract_predict(element)
 
         # choose a prediction
-        print(mnist_prediction, tesseract_prediction)
         if tesseract_prediction == "" and mnist_prediction in ["2", "5"]: # detect '-' like a brute as Tesseract can't handle it
             equation_text += "-"
         else:
@@ -523,7 +532,7 @@ def solve_equation(equation):
     Reads given equation as string, converts it to digits and signs, computes the result and displays it.
     """
     elements, nb_digits, nb_signs = extract_elements_from_string_equation(equation)
-    
+
     # compute equation's result if structure is valid
     if len(elements) > 0 and elements[0][0] == "digit" and elements[-1][0] == "digit" and nb_digits == nb_signs+1 and nb_digits >= 2:
         result = compute_equation_result(elements)
@@ -553,7 +562,7 @@ if __name__ == "__main__":
     # equation_text = process_image("img/generated/additions/4_6.jpg", model, favor_tesseract=True, show_img=False)
     # equation_text = process_image("img/hw_add_rot.jpg", model, favor_tesseract=False, show_img=False)
     # equation_text = process_image("img/hw/7mul7.jpg", model, favor_tesseract=False, show_img=True)
-    equation_text = process_image("img/hw/complex4.jpg", model, favor_tesseract=False, show_img=True)
-    
+    equation_text = process_image("img/hw/complex.jpg", model, favor_tesseract=False, show_img=False)
+
     solved_equation = solve_equation(equation_text)
     print("Your equation:", solved_equation)
