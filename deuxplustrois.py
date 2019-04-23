@@ -44,6 +44,9 @@ def create_test_images(sub_directory, limit_left_op=10, limit_right_op=10, opera
 def test_generated_operations(sub_directory, limit_left_op=10, limit_right_op=10, operator="+"):
     """
     Loads generated images from a subdirectory recreates input and compares with expected output.
+    Images name must be of format 'i_j.jpg' with i and j starting at 0 and lineary incremented up to
+    parameters 'limit_left_op' and 'limit_right_op'. The predicted values are those i + j.
+    I.e. '0_0.jpg', '0_1.jpg', ...
     """
     SOURCE_DIRECTORY = f'../img/generated/{sub_directory}'
     total_success = 0
@@ -105,15 +108,18 @@ def compute_black_white_ratio(img):
     whites = img.shape[0]*img.shape[1] - blacks
     return blacks / whites
 
-def copy_onto_white_square(img, margin=50, show_img=False):
+def copy_onto_white_square(img, img_size=200, show_img=False):
     """
     Copies the given image inside a white square and with a given margin.
     """
+    margin = int(img_size/100 * 20)
     if img.shape[0] > img.shape[1]:
+        img = resize(img, img_size, False, show_img=show_img)
         square_width = img.shape[0] + 2*margin
         y_offset = margin
         x_offset = (img.shape[0] - img.shape[1])//2 + margin
     else:
+        img = resize(img, img_size, True, show_img=show_img)
         square_width = img.shape[1] + 2*margin
         y_offset = (img.shape[1] - img.shape[0])//2 + margin
         x_offset = margin
@@ -165,7 +171,7 @@ def erode(img, kernel=None, show_img=False):
 
     return img_eroded
 
-def erode_until_bw_ratio_reached(img, kernel, target_bw_max_ratio=0.30):
+def erode_until_bw_ratio_reached(img, kernel, target_bw_max_ratio=0.40):
     """
     Erodes given image until desired black and white pixel ratio is reached.
     """
@@ -283,18 +289,19 @@ def load_and_resize(img_path, default_width=600, show_img=False):
         print(f"File has not been found or is of an unsupported format: {img_path}")
         exit()
 
-    img = resize(img, default_width)
+    img = resize(img, default_width, False)
 
     if show_img:
         show(img, "Default image")
 
     return img
 
-def resize(img, width, show_img=False):
+def resize(img, size, resize_by_width=True, show_img=False):
     """
-    Resizes the given image with the given ratio (old_width/width).
+    Resizes the given image with the given ratio (old_size/size) by width or height.
     """
-    ratio = img.shape[1] / width
+    ratio = (img.shape[1] if resize_by_width else img.shape[0]) / size
+        
     width = int(img.shape[1] / ratio)
     height = int(img.shape[0] / ratio)
     dim = (width, height)
@@ -410,9 +417,9 @@ def compute_equation_result(elements):
     Uses reduction to compute and finally return the equation's result.
     """
     elements = copy.deepcopy(elements)
-    for sign in ["x", "/", "+", "-"]: # respect operations priority
+    for sign in [("x", "/"), ("+", "-")]: # respect operations priority
         for i in range(0, len(elements)-1, 2):
-            if elements[i+1][1] == sign:
+            if elements[i+1][1] in sign:
                 if elements[i+1][1] == "x":
                     elements[i+2][1] = float(elements[i+0][1]) * float(elements[i+2][1])
                 elif elements[i+1][1] == "/":
@@ -442,7 +449,7 @@ def mnist_predict(img, model, show_img=False):
     img = img.reshape(-1, 28, 28, 1)
     return model.predict(img)[0]
 
-def process_image(img_path, model, show_img=False):
+def process_image(img_path, model, favor_tesseract=True, show_img=False):
     """
     Reads image and predicts which equation it contains.
     Returns a string containing concatenated digits and elements (i.e. '2+3').
@@ -478,14 +485,14 @@ def process_image(img_path, model, show_img=False):
     elements = [adjust_element_weight(element, show_img=show_img) for element in elements]
 
     # ------------------- mnist/tesseract prediction -------------------
-    equation_text = retrieve_equation(elements, model, show_img=show_img)
+    equation_text = retrieve_equation(elements, model, favor_tesseract, show_img=show_img)
 
     if show_img:
         cv2.destroyAllWindows()
 
     return equation_text
 
-def retrieve_equation(elements, model, show_img=False):
+def retrieve_equation(elements, model, favor_tesseract=True, show_img=False):
     """
     Uses MNIST and Tesseract to predict what represents each image's element and retrieve
     the complete equation.
@@ -493,7 +500,6 @@ def retrieve_equation(elements, model, show_img=False):
     """
     equation_text = ""
     for element in elements:
-
         # predict with MNIST
         mnist_prediction = mnist_predict(element, model, show_img=show_img)
         mnist_prediction = str(np.argmax(mnist_prediction))
@@ -502,9 +508,14 @@ def retrieve_equation(elements, model, show_img=False):
         tesseract_prediction = tesseract_predict(element)
 
         # choose a prediction
-        equation_text += tesseract_prediction if tesseract_prediction in ["+", "-", "x", "/", "="] or \
-                                                    tesseract_prediction == mnist_prediction \
-                                                else mnist_prediction
+        print(mnist_prediction, tesseract_prediction)
+        if tesseract_prediction == "" and mnist_prediction in ["2", "5"]: # detect '-' like a brute as Tesseract can't handle it
+            equation_text += "-"
+        else:
+            if favor_tesseract:
+                equation_text += mnist_prediction if tesseract_prediction == "" else tesseract_prediction
+            else:
+                equation_text += tesseract_prediction if tesseract_prediction in ["+", "-", "x", "/", "="] else mnist_prediction
     return equation_text
 
 def solve_equation(equation):
@@ -523,7 +534,7 @@ def solve_equation(equation):
     print(f"Unable to solve this equation: {equation}")
     exit()
 
-def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0123456789+-x/="):
+def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0123456789+x/-="):
     """
     Uses Tesseract to predict which digit's on the given image.
     Returns a string containing the predicted digit.
@@ -539,8 +550,10 @@ if __name__ == "__main__":
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
 
-    equation_text = process_image("img/hw_add_rot.jpg", model, show_img=False)
-
-    # print(f"Your equation: {equation_text}")
-
-    print("Your equation:", solve_equation(equation_text))
+    # equation_text = process_image("img/generated/additions/4_6.jpg", model, favor_tesseract=True, show_img=False)
+    # equation_text = process_image("img/hw_add_rot.jpg", model, favor_tesseract=False, show_img=False)
+    # equation_text = process_image("img/hw/7mul7.jpg", model, favor_tesseract=False, show_img=True)
+    equation_text = process_image("img/hw/complex4.jpg", model, favor_tesseract=False, show_img=True)
+    
+    solved_equation = solve_equation(equation_text)
+    print("Your equation:", solved_equation)
