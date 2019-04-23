@@ -31,8 +31,8 @@ def create_test_images(sub_directory, limit_left_op=10, limit_right_op=10, opera
     Creates test images containg each numbers between 0 and parameter limit_left_op an operator and another
     number between 0 and parameter limit_right_op.
     """
-    EMPTY_IMAGE = r'../img/clean_empty.jpg'
-    DESTINATION_DIRECTORY = f'../img/generated/{sub_directory}/'
+    EMPTY_IMAGE = r'img/clean_empty.jpg'
+    DESTINATION_DIRECTORY = f'img/generated/{sub_directory}/'
 
     for i in range(limit_left_op):
         for j in range(limit_left_op):
@@ -41,20 +41,20 @@ def create_test_images(sub_directory, limit_left_op=10, limit_right_op=10, opera
             cv2.putText(img, text, (10,100), font, 1, (0, 0, 0), 2, cv2.LINE_AA) # write text on empty image
             cv2.imwrite(DESTINATION_DIRECTORY + f'{i}_{j}.jpg', img) # save new image
 
-def test_generated_operations(sub_directory, limit_left_op=10, limit_right_op=10, operator="+"):
+def test_generated_operations(sub_directory, model, limit_left_op=10, limit_right_op=10, operator="+", favor_tesseract=True, show_img=False):
     """
     Loads generated images from a subdirectory recreates input and compares with expected output.
     Images name must be of format 'i_j.jpg' with i and j starting at 0 and lineary incremented up to
     parameters 'limit_left_op' and 'limit_right_op'. The predicted values are those i + j.
     I.e. '0_0.jpg', '0_1.jpg', ...
     """
-    SOURCE_DIRECTORY = f'../img/generated/{sub_directory}'
+    SOURCE_DIRECTORY = f'img/generated/{sub_directory}'
     total_success = 0
     for i in range(limit_left_op):
         for j in range(limit_right_op):
             img_path = f"{SOURCE_DIRECTORY}/{i}_{j}.jpg"
             input = f'{i}{operator}{j}'
-            output = process_image(img_path, False)
+            output = process_image(img_path, model, favor_tesseract, show_img=show_img).split(" = ")[0]
             success = input==output
             print(input, output, success)
             total_success += 1 if success else 0
@@ -552,17 +552,16 @@ def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0
 
 
 if __name__ == "__main__":
-    # create_test_images("additions")
-    # test_generated_operations("additions")
-
-
     model = load_model("model/mnist_DNN.h5")
     # model.summary()
+
+    # create_test_images("additions")
+    # test_generated_operations("additions", model, favor_tesseract=True, show_img=False)
 
     # equation_text = process_image("img/generated/additions/4_6.jpg", model, favor_tesseract=True, show_img=False)
     # equation_text = process_image("img/hw_add_rot.jpg", model, favor_tesseract=False, show_img=False)
     # equation_text = process_image("img/hw/7mul7.jpg", model, favor_tesseract=False, show_img=True)
-    equation_text = process_image("img/hw/complex.jpg", model, favor_tesseract=False, show_img=False)
+    equation_text = process_image("img/hw/complex3.jpg", model, favor_tesseract=False, show_img=False)
 
     solved_equation = solve_equation(equation_text)
     print("Your equation:", solved_equation)
