@@ -1,9 +1,13 @@
 """
-sources :
+deuxplustrois - Image Processing course,
+Chacun Guillaume, Graells Noah, Vorpe Fabien
+HE-Arc, Neuchâtel, Switzerland
+2019
 
-https://www.pyimagesearch.com/2017/07/10/using-tesseract-ocr-python/
-https://docs.opencv.org/3.1.0/dd/d49/tutorial_py_contour_features.html
-http://blog.ayoungprogrammer.com/2013/01/equation-ocr-part-1-using-contours-to.html/
+***
+
+deuxplustrois.py
+@author: @chacungu, @noahgraells, @fabienvorpe 
 """
 
 import copy
@@ -11,8 +15,10 @@ import cv2
 from keras.models import load_model
 import numpy as np
 import os
+import interface
 from PIL import Image
 import pytesseract
+import sys
 import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.ERROR)
 
@@ -26,39 +32,46 @@ except:
 
 
 # automatic test methods
-def create_test_images(sub_directory, limit_left_op=10, limit_right_op=10, operator="+", font=cv2.FONT_HERSHEY_DUPLEX):
+def create_test_images(sub_directory, min_left_op=10, min_right_op=10, max_left_op=10, max_right_op=10, operator="+", font=cv2.FONT_HERSHEY_DUPLEX):
     """
-    Creates test images containg each numbers between 0 and parameter limit_left_op an operator and another
-    number between 0 and parameter limit_right_op.
+    Creates test images containg each numbers between parameter 'min_left_op' and parameter 'max_left_op' an operator and another
+    number between parameter 'min_right_op' and parameter 'max_right_op'.
     """
     EMPTY_IMAGE = r'img/clean_empty.jpg'
     DESTINATION_DIRECTORY = f'img/generated/{sub_directory}/'
 
-    for i in range(limit_left_op):
-        for j in range(limit_left_op):
+    if not os.path.exists(DESTINATION_DIRECTORY):
+        os.mkdir(DESTINATION_DIRECTORY)
+    
+    for i in range(min_left_op, max_left_op):
+        for j in range(min_right_op, max_left_op):
             text = f'{i}{operator}{j}' # define text
             img = cv2.imread(EMPTY_IMAGE, 1) # load empty image
             cv2.putText(img, text, (10,100), font, 1, (0, 0, 0), 2, cv2.LINE_AA) # write text on empty image
             cv2.imwrite(DESTINATION_DIRECTORY + f'{i}_{j}.jpg', img) # save new image
 
-def test_generated_operations(sub_directory, model, limit_left_op=10, limit_right_op=10, operator="+", favor_tesseract=True, show_img=False):
+def test_generated_operations(sub_directory, model, min_left_op=10, min_right_op=10, max_left_op=10, max_right_op=10, operator="+", favor_tesseract=True, show_img=False):
     """
     Loads generated images from a subdirectory recreates input and compares with expected output.
-    Images name must be of format 'i_j.jpg' with i and j starting at 0 and lineary incremented up to
-    parameters 'limit_left_op' and 'limit_right_op'. The predicted values are those i + j.
+    Images name must be of format 'i_j.jpg' with i and j starting at parameters 'min_left_op' and 'min_right_op' and lineary incremented up to
+    parameters 'max_left_op' and 'max_right_op'. The predicted values are those i + j.
     I.e. '0_0.jpg', '0_1.jpg', ...
     """
-    SOURCE_DIRECTORY = f'img/generated/{sub_directory}'
-    total_success = 0
-    for i in range(limit_left_op):
-        for j in range(limit_right_op):
-            img_path = f"{SOURCE_DIRECTORY}/{i}_{j}.jpg"
-            input = f'{i}{operator}{j}'
-            output = process_image(img_path, model, favor_tesseract, show_img=show_img).split(" = ")[0]
-            success = input==output
-            print(input, output, success)
-            total_success += 1 if success else 0
-    print("Success percentage:", (total_success/(limit_left_op*limit_right_op))*100, "%")
+    try:
+        SOURCE_DIRECTORY = f'img/generated/{sub_directory}'
+        total_success = 0
+        print("Test image's content \t| \tPredicted equation \t| \tTest's success")
+        for i in range(min_left_op, max_left_op):
+            for j in range(min_right_op, max_right_op):
+                img_path = f"{SOURCE_DIRECTORY}/{i}_{j}.jpg"
+                input = f'{i}{operator}{j}'
+                output = process_image(img_path, model, favor_tesseract, show_img=show_img).split(" = ")[0]
+                success = input==output
+                print(f"\t{input} \t\t| \t\t{output} \t\t| \t{success}")
+                total_success += 1 if success else 0
+        print(f"Success percentage: {round((total_success/((max_left_op-min_left_op)*(max_right_op-min_right_op)))*100,2)}")
+    except:
+        print("An error occured. Have the test files really been created ?")
 
 
 # image processing methods
@@ -541,7 +554,7 @@ def solve_equation(equation):
             solved_equation += f" = {result}"
             return solved_equation
     print(f"Unable to solve this equation: {equation}")
-    exit()
+    return None
 
 def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0123456789+x/-="):
     """
@@ -553,6 +566,14 @@ def tesseract_predict(img, config="--psm 10 --oem 0 -c tessedit_char_whitelist=0
 
 if __name__ == "__main__":
     model = load_model("model/mnist_DNN.h5")
+
+    interface = interface.Interface(model)
+
+    if len(sys.argv) > 1:
+        interface.state_2(sys.argv)
+    else:
+        interface.display_state()
+
     # model.summary()
 
     # create_test_images("additions")
@@ -561,7 +582,7 @@ if __name__ == "__main__":
     # equation_text = process_image("img/generated/additions/4_6.jpg", model, favor_tesseract=True, show_img=False)
     # equation_text = process_image("img/hw_add_rot.jpg", model, favor_tesseract=False, show_img=False)
     # equation_text = process_image("img/hw/7mul7.jpg", model, favor_tesseract=False, show_img=True)
-    equation_text = process_image("img/hw/complex3.jpg", model, favor_tesseract=False, show_img=False)
+    # equation_text = process_image("img/hw/complex3.jpg", model, favor_tesseract=False, show_img=False)
 
-    solved_equation = solve_equation(equation_text)
-    print("Your equation:", solved_equation)
+    # solved_equation = solve_equation(equation_text)
+    # print("Your equation:", solved_equation)
