@@ -37,18 +37,29 @@ def create_test_images(sub_directory, min_left_op=10, min_right_op=10, max_left_
     Creates test images containg each numbers between parameter 'min_left_op' and parameter 'max_left_op' an operator and another
     number between parameter 'min_right_op' and parameter 'max_right_op'.
     """
-    EMPTY_IMAGE = r'img/clean_empty.jpg'
-    DESTINATION_DIRECTORY = f'img/generated/{sub_directory}/'
+    # create empty test image
+    RECT_WIDTH = 256
+    EMPTY_IMAGE = np.zeros((RECT_WIDTH, RECT_WIDTH, 3), np.uint8)
+    EMPTY_IMAGE[:, 0:RECT_WIDTH//2] = (255, 255, 255)
+    EMPTY_IMAGE[:, RECT_WIDTH//2:RECT_WIDTH] = (255, 255, 255)
 
+    # create directories
+    TEST_IMG_DIRECTORY = "img"
+    if not os.path.exists(TEST_IMG_DIRECTORY):
+        os.mkdir(TEST_IMG_DIRECTORY)
+    TEST_IMG_SUBDIRECTORY = f"test_img"
+    if not os.path.exists(f"{TEST_IMG_DIRECTORY}/{TEST_IMG_SUBDIRECTORY}"):
+        os.mkdir(f"{TEST_IMG_DIRECTORY}/{TEST_IMG_SUBDIRECTORY}")
+    DESTINATION_DIRECTORY = f"{TEST_IMG_DIRECTORY}/{TEST_IMG_SUBDIRECTORY}/{sub_directory}/"
     if not os.path.exists(DESTINATION_DIRECTORY):
         os.mkdir(DESTINATION_DIRECTORY)
     
     for i in range(min_left_op, max_left_op):
         for j in range(min_right_op, max_left_op):
-            text = f'{i}{operator}{j}' # define text
-            img = cv2.imread(EMPTY_IMAGE, 1) # load empty image
-            cv2.putText(img, text, (10,100), font, 1, (0, 0, 0), 2, cv2.LINE_AA) # write text on empty image
-            cv2.imwrite(DESTINATION_DIRECTORY + f'{i}_{j}.jpg', img) # save new image
+            text = f"{i} {operator} {j}" # define text
+            img = EMPTY_IMAGE.copy() #cv2.imread(EMPTY_IMAGE, 1) # load empty image
+            cv2.putText(img, text, (10, 100), font, 1, (0, 0, 0), 2, cv2.LINE_AA) # write text on empty image
+            cv2.imwrite(DESTINATION_DIRECTORY + f"{i}_{j}.jpg", img) # save new image
 
 def test_generated_operations(sub_directory, model, min_left_op=10, min_right_op=10, max_left_op=10, max_right_op=10, operator="+", favor_tesseract=True, show_img=False):
     """
@@ -58,7 +69,7 @@ def test_generated_operations(sub_directory, model, min_left_op=10, min_right_op
     I.e. '0_0.jpg', '0_1.jpg', ...
     """
     try:
-        SOURCE_DIRECTORY = f'img/generated/{sub_directory}'
+        SOURCE_DIRECTORY = f"img/test_img/{sub_directory}"
         total_success = 0
         print("Test image's content \t| \tPredicted equation \t| \tTest's success")
         for i in range(min_left_op, max_left_op):
@@ -70,6 +81,8 @@ def test_generated_operations(sub_directory, model, min_left_op=10, min_right_op
                 print(f"\t{input} \t\t| \t\t{output} \t\t| \t{success}")
                 total_success += 1 if success else 0
         print(f"Success percentage: {round((total_success/((max_left_op-min_left_op)*(max_right_op-min_right_op)))*100,2)}")
+    except KeyboardInterrupt as _:
+        return
     except:
         print("An error occured. Have the test files really been created ?")
 

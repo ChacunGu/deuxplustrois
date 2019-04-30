@@ -22,7 +22,7 @@ class Interface:
         self.favor_tesseract = False
         self.show_algorithm_steps = False
 
-    def read_int(self, allowed_range):
+    def read_int(self, allowed_range, allow_ctrlc=False):
         """
         Reads an integer from the given list of the command-line.
         """
@@ -32,9 +32,11 @@ class Interface:
                 print(f"Please enter a number from this range: {allowed_range}")
                 user_input = int(input())
             return user_input
-        except:
+        except (Exception, KeyboardInterrupt) as e:
+            if allow_ctrlc and type(e) is KeyboardInterrupt:
+                return None
             print(f"Please enter a number from this range: {allowed_range}")
-            return self.read_int(allowed_range)
+            return self.read_int(allowed_range, allow_ctrlc)
 
     def does_image_exist(self, filename):
         """
@@ -82,9 +84,9 @@ class Interface:
         Menu n°1: select an operation.
         """
         print("")
-        print("*** Welcome on deuxplustrois! ***")
-        print("What do you want to do ?")
-        print("(1) Load an image and compute equation's result")
+        print("###### Welcome on deuxplustrois! ######")
+        print("*** What do you want to do ? ***")
+        print("(1) Load an image and compute the equation's result")
         print("(2) Automatic testing")
         print("(3) Exit")
 
@@ -159,7 +161,7 @@ class Interface:
         Menu n°4: display steps ?
         """
         print("")
-        print("*** Do you want to see intermediary images (algorithm's steps) ? ***")
+        print("*** Do you want to display intermediary images (algorithm's steps) ? ***")
         print("(1) Yes")
         print("(2) No")
         print("(3) Back to main menu")
@@ -182,7 +184,7 @@ class Interface:
         print(f"Processing {self.filename}. Please wait...")
         print("Parameters:")
         print(f"  favor Tesseract over MNIST: {self.favor_tesseract}")
-        print(f"  show algorithm steps: {self.show_algorithm_steps}")
+        print(f"  display algorithm steps: {self.show_algorithm_steps}")
         print("")
         equation_text = process_image(self.filename, self.model, favor_tesseract=self.favor_tesseract, show_img=self.show_algorithm_steps)
         solved_equation = solve_equation(equation_text)
@@ -197,7 +199,7 @@ class Interface:
         Menu n°6: did we read the equation successfuly ?
         """
         print("")
-        print("*** Did we read your equation successfuly ? ***")
+        print("*** Did we read your equation correctly ? ***")
         print("(1) Yes")
         print("(2) No")
         print("(3) Back to main menu")
@@ -238,7 +240,7 @@ class Interface:
         print("")
         print("*** Automatic tests menu - What do you want to do ? ***")
         print("(1) Create test images")
-        print("(2) Start automatic tests")
+        print("(2) Start automatic testing")
         print("(3) Back to main menu")
         
         user_input = self.read_int([1,2,3])
@@ -256,15 +258,14 @@ class Interface:
         Menu n°9: Enter lower bound
         """
         print("")
-        print("*** Please enter lower bound for automatic tests image's range ***")
+        print("*** Please enter lower bound for automatic tests images range ***")
         
-        try:
-            user_input = self.read_int(range(999))
-        except:
-            self.next_state(1)
-            return
-        self.automatic_tests_lower_bound = user_input
-        self.next_state(10)
+        user_input = self.read_int(range(1000), True)
+        if user_input is not None:
+            self.automatic_tests_lower_bound = user_input
+            self.next_state(10)
+        else:
+            self.next_state(8)
      
     def state_10(self):
         """
@@ -273,29 +274,28 @@ class Interface:
         print("")
         print("*** Please enter upper bound for automatic tests image's range (not included) ***")
         
-        try:
-            user_input = self.read_int(range(999))
-            while user_input <= self.automatic_tests_lower_bound:
-                print(f"Please choose an upper bound bigger than your lower bound: {self.automatic_tests_lower_bound}")
-                user_input = self.read_int(range(999))
-        except:
-            self.next_state(1)
-            return
+        user_input = self.read_int(range(1000), True)
+        while user_input is not None and user_input <= self.automatic_tests_lower_bound:
+            print(f"Please enter an upper bound bigger than your lower bound: {self.automatic_tests_lower_bound}")
+            user_input = self.read_int(range(1000), True)
 
-        self.automatic_tests_upper_bound = user_input
-        self.next_state(11)
+        if user_input is not None:
+            self.automatic_tests_upper_bound = user_input
+            self.next_state(11)
+        else:
+            self.next_state(8)
      
     def state_11(self):
         """
         Menu n°11: Enter operation
         """
         print("")
-        print("*** Please choose an operation ***")
+        print("*** Please select an operation ***")
         print("(1) +")
         print("(2) -")
         print("(3) x")
         print("(4) /")
-        print("(5) Back to main menu")
+        print("(5) Back to automatic tests menu")
         
         user_input = self.read_int([1,2,3,4,5])
         if user_input == 1:
@@ -311,7 +311,7 @@ class Interface:
             self.automatic_tests_operator = "/"
             self.automatic_tests_subdirectory = "divisions"
         elif user_input == 5:
-            self.next_state(1)
+            self.next_state(8)
             return
         
         if self.automatic_tests_state == 0:
@@ -325,18 +325,18 @@ class Interface:
         """
         print("")
         print("*** Please select an OpenCV font ***")
-        print("(1) FONT_HERSHEY_SIMPLEX")
-        print("(2) FONT_HERSHEY_PLAIN")
-        print("(3) FONT_HERSHEY_DUPLEX")
-        print("(4) FONT_HERSHEY_COMPLEX")
-        print("(5) FONT_HERSHEY_TRIPLEX")
-        print("(6) FONT_HERSHEY_COMPLEX_SMALL")
-        print("(7) FONT_HERSHEY_SCRIPT_SIMPLEX")
-        print("(8) FONT_HERSHEY_SCRIPT_COMPLEX")
-        print("(9) FONT_ITALIC")
-        print("(10) Back to main menu")
+        print("(1)  FONT_HERSHEY_SIMPLEX")
+        print("(2)  FONT_HERSHEY_PLAIN")
+        print("(3)  FONT_HERSHEY_DUPLEX")
+        print("(4)  FONT_HERSHEY_COMPLEX")
+        print("(5)  FONT_HERSHEY_TRIPLEX")
+        print("(6)  FONT_HERSHEY_COMPLEX_SMALL")
+        print("(7)  FONT_HERSHEY_SCRIPT_SIMPLEX")
+        print("(8)  FONT_HERSHEY_SCRIPT_COMPLEX")
+        print("(9)  FONT_ITALIC")
+        print("(10) Back to automatic tests menu")
         
-        user_input = self.read_int(range(10))
+        user_input = self.read_int([1,2,3,4,5,6,7,8,9,10])
         if user_input == 1:
             self.automatic_tests_font = cv2.FONT_HERSHEY_SIMPLEX
         elif user_input == 2:
@@ -356,7 +356,7 @@ class Interface:
         elif user_input == 9:
             self.automatic_tests_font = cv2.FONT_ITALIC
         elif user_input == 10:
-            self.next_state(1)
+            self.next_state(8)
             return
         
         self.next_state(13)
@@ -373,7 +373,7 @@ class Interface:
 
         create_test_images(self.automatic_tests_subdirectory, min_left_op, min_right_op, max_left_op, max_right_op, self.automatic_tests_operator, self.automatic_tests_font)
 
-        print("Test images have been created.")
+        print(f"Test images have been created in 'img/test_img/{self.automatic_tests_subdirectory}/'")
         self.next_state(8)
      
     def state_14(self):
