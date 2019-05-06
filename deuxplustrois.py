@@ -587,15 +587,3 @@ if __name__ == "__main__":
     else:
         interface.display_state()
 
-    # model.summary()
-
-    # create_test_images("additions")
-    # test_generated_operations("additions", model, favor_tesseract=True, show_img=False)
-
-    # equation_text = process_image("img/generated/additions/4_6.jpg", model, favor_tesseract=True, show_img=False)
-    # equation_text = process_image("img/hw_add_rot.jpg", model, favor_tesseract=False, show_img=False)
-    # equation_text = process_image("img/hw/7mul7.jpg", model, favor_tesseract=False, show_img=True)
-    # equation_text = process_image("img/hw/complex3.jpg", model, favor_tesseract=False, show_img=False)
-
-    # solved_equation = solve_equation(equation_text)
-    # print("Your equation:", solved_equation)
